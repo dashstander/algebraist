@@ -1,10 +1,10 @@
 from functools import reduce
-from itertools import combinations, pairwise, permutations
+from itertools import combinations, pairwise
 import numpy as np
 import torch
 
 from .permutations import Permutation
-from .tableau import enumerate_standard_tableau, YoungTableau
+from .tableau import enumerate_standard_tableau
 
 
 def adj_trans_decomp(i: int, j: int) -> list[tuple[int]]:
@@ -114,57 +114,3 @@ class SnIrrep:
         matrices = self.matrix_representations()
         tensors = [torch.asarray(matrices[perm.sigma]).unsqueeze(0) for perm in self.permutations if perm.parity == 0]
         return torch.concatenate(tensors, dim=0).squeeze()
-
-
-class TrivialRep(SnIrrep):
-
-    def __init__(self, n):
-        self.n = n
-        self.permutations = [
-            Permutation(seq) for seq in permutations(list(range(n)))
-        ]
-        self.basis = [YoungTableau([list(range(n))])]
-    
-    def matrix_representations(self):
-        return {
-            perm.sigma : 1. for perm in self.permutations
-        }
-
-
-class AlternatingRep(SnIrrep):
-    def __init__(self, n):
-        self.n = n
-        self.permutations = [
-            Permutation(seq) for seq in permutations(list(range(n)))
-        ]
-        self.basis = [YoungTableau([[i] for i in range(n)])]
-        self.dim = len(self.basis)
-    
-    @staticmethod
-    def _sign(perm):
-        if perm.parity == 0:
-            return 1.
-        else:
-            return -1.
-    
-    def matrix_representations(self):
-        return {
-            perm.sigma : self._sign(perm) for perm in self.permutations
-        }
-
-
-def make_irrep(partition):
-
-    if list(partition) != sorted(partition, reverse=True):
-        raise ValueError(
-            f'Partition {partition} is not sorted in descending order.'
-        )
-    
-    n = sum(partition)
-
-    if partition == (n):
-        return TrivialRep(n)
-    elif partition == tuple([1] * n):
-        return AlternatingRep(n)
-    else:
-        return SnIrrep(n, partition)

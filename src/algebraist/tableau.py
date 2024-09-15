@@ -1,6 +1,8 @@
 from copy import deepcopy
-from functools import cache, total_ordering
-
+from functools import cache, total_ordering, reduce
+from itertools import chain
+from math import factorial
+from operator import mul
 
 def _check_shape(partition_shape):
     for i in range(len(partition_shape) - 1):
@@ -144,6 +146,9 @@ class YoungTableau:
         row_dist = row_x - row_y
         col_dist = col_y - col_x
         return row_dist + col_dist
+    
+    def __hash__(self):
+        return hash(str(self.values))
 
 
 def _enumerate_next_placements(unfinished_syt):
@@ -178,9 +183,44 @@ def _fill_unfinished_tableau(tableau, numbers):
 def enumerate_standard_tableau(partition_shape: tuple[int]) -> list[YoungTableau]:
     _check_shape(partition_shape)
     n = sum(partition_shape)
+    if n == 1:
+        return [YoungTableau([[0]])]
     base_tableau = [[-1] * length for length in partition_shape]
     numbers = list(range(n))
     numbers.reverse()
     base_tableau[0][0] = numbers.pop()
     all_tableaus = _fill_unfinished_tableau(base_tableau, numbers)
     return sorted(all_tableaus)
+
+
+
+def hook_length(partition):
+    """
+    Calculate the number of standard Young tableaux for a given partition
+    using the hook length formula.
+    
+    Args:
+    partition (tuple): A tuple representing the partition (in descending order)
+    
+    Returns:
+    int: The number of standard Young tableaux for the given partition
+    """
+    n = sum(partition)
+
+    if n == 1:
+        return 1
+    
+    # Create the Young diagram
+    diagram = [[0 for _ in range(partition[i])] for i in range(len(partition))]
+    
+    # Calculate hook lengths
+    for i in range(len(partition)):
+        for j in range(partition[i]):
+            # Hook length is (number of boxes below + number of boxes to the right )
+            diagram[i][j] = partition[i] - j + sum(1 for row in partition[i+1:] if row > j)
+        
+    # Calculate the product of hook lengths
+    hook_product = reduce(mul, chain.from_iterable(diagram))
+
+    # Apply the formula
+    return factorial(n) // hook_product
