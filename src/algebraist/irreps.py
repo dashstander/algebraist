@@ -105,10 +105,10 @@ class SnIrrep:
         self._matrices = matrices
         return matrices
 
-    def matrix_tensor(self):
+    def matrix_tensor(self, dtype=torch.float64):
         matrices = self.matrix_representations()
         tensors = [torch.asarray(matrices[perm.sigma]).unsqueeze(0) for perm in self.permutations]
-        return torch.concatenate(tensors, dim=0).squeeze()
+        return torch.concatenate(tensors, dim=0).squeeze().to(dtype)
     
     def alternating_matrix_tensor(self):
         matrices = self.matrix_representations()

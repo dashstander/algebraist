@@ -1,4 +1,5 @@
 from hypothesis import given, strategies as st
+import math
 import pytest
 
 from algebraist.permutations import Permutation
@@ -78,9 +79,11 @@ def test_transposition_decomposition():
     assert p.transposition_decomposition() == [(0, 2), (1, 2)]
 
 
-def test_permutation_index():
-    p = Permutation([1, 2, 0])
-    assert p.permutation_index() == 6
+
+@pytest.mark.parametrize("n", [3, 4, 5])
+def test_permutation_index(n):
+    indices = [p.permutation_index() for p in Permutation.full_group(n)]
+    assert indices == list(range(math.factorial(n)))
 
 
 @pytest.mark.parametrize("perm, expected_class", [

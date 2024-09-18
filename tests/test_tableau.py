@@ -76,12 +76,16 @@ def test_hook_length_known_values():
     assert hook_length((2, 2)) == 2
     assert hook_length((2, 1, 1)) == 3
     assert hook_length((1, 1, 1, 1)) == 1
+    assert hook_length((4, 1)) == 4
+    assert hook_length((2, 1, 1, 1)) == 4
+    assert hook_length((3, 2)) == 5
+    assert hook_length((3, 1, 1)) == 6
     assert hook_length((5, 4, 1)) == 288
-
 
 
 def test_generate_partitions():
     assert set(generate_partitions(4)) == {(4,), (3, 1), (2, 2), (2, 1, 1), (1, 1, 1, 1)}
+    assert set(generate_partitions(5)) == {(5,), (4, 1), (3, 2), (3, 1, 1), (2, 2, 1), (2, 1, 1, 1), (1, 1, 1, 1, 1)}
 
 
 def test_enumerate_standard_tableau():
@@ -128,9 +132,7 @@ def test_generate_partitions_sum(n):
 @given(partition=partition_strategy())
 def test_standard_tableau_count(partition):
     tableaux = enumerate_standard_tableau(partition)
-    # This is not an efficient way to calculate the number of standard tableaux,
-    # but it works for small partitions. For larger ones, you'd use the hook length formula.
-    expected_count = len(set(enumerate_standard_tableau(partition)))
+    expected_count = hook_length(partition)
     assert len(tableaux) == expected_count
 
 
@@ -140,9 +142,11 @@ def test_hook_length_matches_enumeration(partition):
     enumeration_count = len(enumerate_standard_tableau(partition))
     assert hook_count == enumeration_count
 
+
 @given(partition=partition_strategy())
 def test_hook_length_positive(partition):
     assert hook_length(partition) > 0
+
 
 @given(n=st.integers(1, 10))
 def test_hook_length_sum_factorial(n):
@@ -152,7 +156,6 @@ def test_hook_length_sum_factorial(n):
     expected = factorial(n)
     print(f"n: {n}, Total from hook lengths: {total}, n!: {expected}")  # Debug print
     assert total == expected, f"Sum of hook lengths ({total}) does not equal {n}! ({expected}) for n={n}"
-
 
 
 if __name__ == '__main__':
