@@ -1,6 +1,5 @@
 import math
 import torch
-from torch.utils._pytree import tree_map
 from algebraist.irreps import SnIrrep
 from algebraist.permutations import Permutation
 from algebraist.tableau import generate_partitions

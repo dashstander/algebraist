@@ -171,9 +171,11 @@ class Permutation:
         return adjacent_transpositions
 
     def permutation_index(self):
-        return (
-            sum([math.factorial(self.n - i) * (sigma - i) for i, sigma in enumerate(self.sigma)])
-        )
+        index = 0
+        for i, val in enumerate(self.sigma):
+            smaller_count = sum(1 for j in range(i+1, self.n) if self.sigma[j] < val)
+            index += smaller_count * math.factorial(self.n - i - 1)
+        return index
     
     def index_of_n(self):
         return self.sigma.index(self.n-1)
