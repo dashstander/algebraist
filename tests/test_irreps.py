@@ -34,7 +34,7 @@ def test_trivial_rep():
     assert triv.n == 4
     assert triv.dim == 1
     for perm in Permutation.full_group(4):
-        assert np.allclose(triv.matrix_representations()[perm.sigma], [[1]])
+        assert np.allclose(triv.matrix_representations[perm.sigma], [[1]])
 
 
 def test_alternating_rep():
@@ -43,7 +43,7 @@ def test_alternating_rep():
     assert alt.dim == 1
     for perm in Permutation.full_group(4):
         expected = 1 if perm.parity == 0 else -1
-        assert np.allclose(alt.matrix_representations()[perm.sigma], [[expected]])
+        assert np.allclose(alt.matrix_representations[perm.sigma], [[expected]])
 
 
 @given(st.integers(2, 5))
@@ -57,7 +57,7 @@ def test_adjacent_transposition_matrices(n):
 
 def test_matrix_representations():
     irrep = SnIrrep(3, (2, 1))
-    reps = irrep.matrix_representations()
+    reps = irrep.matrix_representations
     assert len(reps) == 6  # There are 6 permutations in S3
     for _, matrix in reps.items():
         assert matrix.shape == (2, 2)  # The (2,1) irrep of S3 is 2-dimensional
@@ -80,8 +80,8 @@ def test_orthogonality_relations(n):
         for irrep2 in irreps:
             if irrep1.shape != irrep2.shape:
                 continue
-            reps1 = irrep1.matrix_representations()
-            reps2 = irrep2.matrix_representations()
+            reps1 = irrep1.matrix_representations
+            reps2 = irrep2.matrix_representations
             sum_matrix = sum(reps1[perm.sigma] @ np.conj(reps2[perm.sigma].T) for perm in Permutation.full_group(n))
             expected = np.eye(sum_matrix.shape[0]) if irrep1.shape == irrep2.shape else np.zeros_like(sum_matrix)
             assert np.allclose(sum_matrix / len(reps1), expected)
@@ -99,7 +99,7 @@ def test_all_partitions(n):
         assert irrep.n == n
         assert irrep.shape == partition
         assert irrep.dim == len(irrep.basis)
-        reps = irrep.matrix_representations()
+        reps = irrep.matrix_representations
         assert len(reps) == math.factorial(n)
         for _, matrix in reps.items():
             assert matrix.shape == (irrep.dim, irrep.dim)
@@ -112,7 +112,7 @@ def test_representation_homomorphism(n_and_permutations):
     
     for partition in partitions:
         irrep = SnIrrep(n, partition)
-        reps = irrep.matrix_representations()
+        reps = irrep.matrix_representations
         
         composed_perm = reduce(lambda x, y: x * y, permutations)
         rep_composed = reps[composed_perm.sigma]

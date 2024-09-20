@@ -1,40 +1,12 @@
-from functools import reduce
+from copy import deepcopy
+from functools import cached_property, reduce
 from itertools import combinations, pairwise
 import numpy as np
 import torch
 
-from .permutations import Permutation
-from .tableau import enumerate_standard_tableau
-
-
-def adj_trans_decomp(i: int, j: int) -> list[tuple[int]]:
-    center = [(i, i + 1)]
-    i_to_j = list(range(i+1, j+1))
-    adj_to_j = list(pairwise(i_to_j))
-    return list(reversed(adj_to_j)) + center + adj_to_j
-
-
-def cycle_to_one_line(cycle_rep):
-    n = sum([len(c) for c in cycle_rep])
-    sigma = [-1] * n
-    for cycle in cycle_rep:
-        first = cycle[0]
-        if len(cycle) == 1:
-            sigma[first] = first
-        else:
-            for val1, val2 in pairwise(cycle):
-                sigma[val2] = val1
-                lastval  = val2
-            sigma[first] = lastval
-    return tuple(sigma)
-
-
-def trans_to_one_line(i, j, n):
-    sigma = list(range(n))
-    sigma[i] = j
-    sigma[j] = i
-    return tuple(sigma)
-
+from algebraist.permutations import Permutation
+from algebraist.tableau import enumerate_standard_tableau, generate_partitions, hook_length
+from algebraist.utils import adj_trans_decomp, trans_to_one_line
 
 
 class SnIrrep:
@@ -42,10 +14,43 @@ class SnIrrep:
     def __init__(self, n: int, partition: tuple[int]):
         self.n = n
         self.shape = partition
-        self.basis = enumerate_standard_tableau(partition)
+        self.dim = hook_length(self.shape)
         self.permutations = Permutation.full_group(n)
-        self.dim = len(self.basis)
-        self._matrices = None
+
+    @staticmethod
+    def generate_all_irreps(n: int):
+        for partition in generate_partitions(n):
+            yield SnIrrep(n, partition)
+
+    def __eq__(self, other):
+        return self.shape == other.shape
+    
+    def __hash__(self):
+        return hash(str(self.shape))
+    
+    @cached_property
+    def basis(self):
+        return enumerate_standard_tableau(self.shape)
+
+    def split_partition(self):
+        new_partitions = []
+        k = len(self.shape)
+        for i in range(k - 1):
+            # check if valid subrepresentation
+            if self.shape[i] > self.shape[i+1]:
+                # if so, copy, modify, and append to list
+                partition = list(deepcopy(self.shape))
+                partition[i] -= 1
+                new_partitions.append(tuple(partition))
+        # the last subrep
+        partition = list(deepcopy(self.shape))
+        if partition[-1] > 1:
+            partition[-1] -= 1
+        else:
+        # removing last element of partition if it’s a 1
+            del partition[-1]
+        new_partitions.append(tuple(partition))
+        return new_partitions
 
     def adjacent_transpositions(self):
         return pairwise(range(self.n))
@@ -83,9 +88,8 @@ class SnIrrep:
             matrices[(i, j)] = reduce(lambda x, y: x @ y, decomp)
         return matrices
 
+    @cached_property
     def matrix_representations(self):
-        if self._matrices is not None:
-            return self._matrices
         transpo_matrices = self.generate_transposition_matrices()
         matrices = {
             trans_to_one_line(*k, self.n): v for k, v in transpo_matrices.items()
@@ -105,12 +109,21 @@ class SnIrrep:
         self._matrices = matrices
         return matrices
 
-    def matrix_tensor(self, dtype=torch.float64):
-        matrices = self.matrix_representations()
-        tensors = [torch.asarray(matrices[perm.sigma]).unsqueeze(0) for perm in self.permutations]
-        return torch.concatenate(tensors, dim=0).squeeze().to(dtype)
+    def matrix_tensor(self, dtype=torch.float64, device=torch.device('cpu')):
+        tensors = [
+            torch.from_numpy(self.matrix_representations[perm.sigma]).unsqueeze(0).to(dtype)
+            for perm in self.permutations
+        ]
+        return torch.concatenate(tensors, dim=0).squeeze().to(device)
+
+    def coset_rep_matrices(self, dtype=torch.float64):
+        coset_reps = [Permutation.transposition(self.n, i, self.n-1).sigma for i in range(self.n - 1)]
+        coset_reps +=  [Permutation.identity(self.n).sigma]
+        return [torch.from_numpy(self.matrix_representations[rep]).to(dtype) for rep in coset_reps]
     
-    def alternating_matrix_tensor(self):
-        matrices = self.matrix_representations()
-        tensors = [torch.asarray(matrices[perm.sigma]).unsqueeze(0) for perm in self.permutations if perm.parity == 0]
-        return torch.concatenate(tensors, dim=0).squeeze()
+    def alternating_matrix_tensor(self, dtype=torch.float64, device=torch.device('cpu')):
+        tensors = [
+            torch.asarray(self.matrix_representations[perm.sigma]).unsqueeze(0).to(dtype)
+            for perm in self.permutations if perm.parity == 0
+        ]
+        return torch.concatenate(tensors, dim=0).squeeze().to(device)

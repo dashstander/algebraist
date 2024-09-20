@@ -3,7 +3,9 @@ import math
 import numpy as np
 import pytest
 import torch
-from algebraist.fourier import slow_sn_ft, slow_sn_ift, slow_sn_fourier_decomposition, calc_power
+from algebraist.fourier import (
+    slow_sn_ft, slow_sn_ift, slow_sn_fourier_decomposition, sn_fft, calc_power
+)
 from algebraist.permutations import Permutation
 from algebraist.irreps import SnIrrep
 
@@ -111,7 +113,7 @@ def test_permutation_action(n):
     for shape, matrix in ft.items():
         irrep = SnIrrep(n, shape)
         rho = torch.tensor(
-            irrep.matrix_representations()[perm.sigma],
+            irrep.matrix_representations[perm.sigma],
             dtype=f.dtype,
             device=matrix.device
         )
@@ -120,6 +122,18 @@ def test_permutation_action(n):
     for shape in ft.keys():
         assert torch.allclose(ft_perm[shape], ft_action[shape], atol=1e-4), \
             f"Permutation action failed for n={n}, shape={shape}"
+        
+
+def test_sn_fft():
+    n = 5
+    f = generate_random_function(n)
+    slow_ft = slow_sn_ft(f, n)
+    fast_ft = sn_fft(f, n)
+
+    equalities = {}
+    for irrep, tensor in fast_ft.items():
+        equalities[irrep] = torch.allclose(slow_ft[irrep], tensor, atol=1.e-4)
+    assert all(equalities.values()), equalities
 
 
 

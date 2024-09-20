@@ -4,13 +4,24 @@ from itertools import chain
 from math import factorial
 from operator import mul
 
-def _check_shape(partition_shape):
+
+
+
+def check_partition_shape(partition_shape):
+    """
+    Checks that a given shape defines a correct partition, in particular that is in decreasing order.
+    Args:
+        partition_shape (tuple[int]): the partition of n
+    Returns:
+        bool True if valid, False otherwise
+    """
     for i in range(len(partition_shape) - 1):
         j = i + 1
         if partition_shape[j] > partition_shape[i]:
-            raise ValueError(
-                f'Partition {partition_shape} is not in decreasing order.'
-            )
+            return False
+    return True
+
+
 
 def _subpartitions(part):
     assert len(part) >= 2
@@ -63,11 +74,6 @@ def _generate_partitions(n):
                 ) for p in _generate_partitions(k)
             )
     return partitions
-
-
-def check_parity(partition):
-    even_cycles = [c for c in partition if (c % 2 == 0)]
-    return len(even_cycles) % 2
 
 
 def generate_partitions(n):
@@ -180,8 +186,10 @@ def _fill_unfinished_tableau(tableau, numbers):
         return all_tableaus
 
 
+@cache
 def enumerate_standard_tableau(partition_shape: tuple[int]) -> list[YoungTableau]:
-    _check_shape(partition_shape)
+    if not check_partition_shape(partition_shape):
+        raise ValueError(f'Shape {partition_shape} is not a valid partition.')
     n = sum(partition_shape)
     if n == 1:
         return [YoungTableau([[0]])]

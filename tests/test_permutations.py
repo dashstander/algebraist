@@ -101,15 +101,6 @@ def test_adjacent_transposition_decomposition():
     assert p.adjacent_transposition_decomposition() == expected
 
 
-def test_fft_coset_rep_and_new_value():
-    p = Permutation([2, 3, 1, 0])
-    expected_rep = Permutation((0, 3, 2, 1))
-    expected_s3_element = (2, 0, 1)
-    rep, new_value = p.fft_coset_rep_and_new_value()
-    assert new_value.sigma == expected_s3_element
-    assert rep == expected_rep
-
-
 # Property: parity of product is product of parities
 @given(perm1=permutation_strategy(), perm2=permutation_strategy())
 def test_parity_product_property(perm1, perm2):

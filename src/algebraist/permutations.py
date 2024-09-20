@@ -180,12 +180,3 @@ class Permutation:
     def index_of_n(self):
         return self.sigma.index(self.n-1)
     
-    def fft_coset_rep_and_new_value(self):
-        coset_rep = Permutation.transposition(
-            self.n,
-            self.index_of_n(),
-            self.n - 1
-        )
-        sn_minus_one = (coset_rep * self).sigma
-        return coset_rep, Permutation(tuple(sn_minus_one[:-1]))
-
