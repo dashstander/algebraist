@@ -28,9 +28,12 @@ class SnIrrep:
     def __hash__(self):
         return hash(str(self.shape))
     
+    def __repr__(self):
+        return f'S{self.n} Irrep: {self.shape}'
+    
     @cached_property
     def basis(self):
-        return enumerate_standard_tableau(self.shape)
+        return sorted(enumerate_standard_tableau(self.shape))
 
     def split_partition(self):
         new_partitions = []
@@ -50,7 +53,7 @@ class SnIrrep:
         # removing last element of partition if it’s a 1
             del partition[-1]
         new_partitions.append(tuple(partition))
-        return new_partitions
+        return sorted(new_partitions)
 
     def adjacent_transpositions(self):
         return pairwise(range(self.n))
@@ -119,7 +122,7 @@ class SnIrrep:
     def coset_rep_matrices(self, dtype=torch.float64):
         coset_reps = [Permutation.transposition(self.n, i, self.n-1).sigma for i in range(self.n - 1)]
         coset_reps +=  [Permutation.identity(self.n).sigma]
-        return [torch.from_numpy(self.matrix_representations[rep]).to(dtype) for rep in coset_reps]
+        return  [torch.from_numpy(self.matrix_representations[rep]).to(dtype) for rep in coset_reps]
     
     def alternating_matrix_tensor(self, dtype=torch.float64, device=torch.device('cpu')):
         tensors = [

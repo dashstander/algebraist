@@ -6,7 +6,6 @@ from operator import mul
 
 
 
-
 def check_partition_shape(partition_shape):
     """
     Checks that a given shape defines a correct partition, in particular that is in decreasing order.
@@ -126,17 +125,42 @@ class YoungTableau:
         return True
 
     def __lt__(self, other):
-        if not isinstance(other, YoungTableau):
-            other = YoungTableau(other)
-        if (self.n != other.n) or (self.shape != other.shape):
-            raise ValueError('Can only compare two tableau of the same shape')
-        for row1, row2 in zip(self.values, other.values):
-            if row1 == row2:
-                continue
-            for v1, v2 in zip(row1, row2):
-                if v1 == v2:
-                    continue
-                return v1 < v2
+        """Define a custom ordering for Young tableaux consistent with restrictions.
+
+        !!!!! A SHOCKINGLY IMPORTANT METHOD !!!!!
+        This is __not__ the lexicographic order on tableaux. It is an order that is 
+        designed to be consistent with restrictions to smaller tableaux.
+        
+        This ordering is crucial because:
+        1. It defines the basis of the matrix irreps.
+        2. We specifically want the elements of S_{n-1} < S_n (the elements of S_n 
+        that fix n) to have a block-diagonal structure.
+        3. We want those blocks to be identical to the irreps of S_{n-1} as its own group.
+        
+        This approach saves us a lot of complication when doing the recursion in the FFT.
+        """
+        if self.n != other.n:
+            return self.n < other.n
+        
+        if self.n == 1:
+            return False  # All tableaux of size 1 are equal
+        self_n_index = self.index(self.n - 1)
+        other_n_index = other.index(self.n - 1)
+                                  
+        if self_n_index == other_n_index:
+            # Compare restricted shapes
+            return self.restrict() <  other.restrict()
+        else:
+            return self_n_index < other_n_index
+        
+        
+    
+    def restrict(self):
+        return YoungTableau([[v for v in row if v != self.n - 1] for row in self.values])
+    
+    def restricted_shape(self) -> tuple[int, ...]:
+        """Return the shape of the tableau after removing the largest number."""
+        return tuple([tuple([v for v in row if v != self.n - 1]) for row in self.values])
 
     def index(self, val):
         for r, row in enumerate(self.values):
