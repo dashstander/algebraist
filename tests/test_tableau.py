@@ -23,12 +23,13 @@ def partition_strategy(draw, max_n=10):
     
     return tuple(partition)
 
+
 @st.composite
 def young_tableau_strategy(draw):
     partition = draw(partition_strategy())
-    values = list(range(1, sum(partition) + 1))
-    random.shuffle(values)
-    tableau = [values[sum(partition[:i]):sum(partition[:i+1])] for i in range(len(partition))]
+    n = sum(partition)
+    values = draw(st.permutations(range(1, n + 1)))
+    tableau = [list(values[sum(partition[:i]):sum(partition[:i+1])]) for i in range(len(partition))]
     return YoungTableau(tableau)
 
 
@@ -151,12 +152,11 @@ def test_hook_length_positive(partition):
 @given(n=st.integers(1, 10))
 def test_hook_length_sum_factorial(n):
     partitions = generate_partitions(n)
-    print(partitions)
     total = sum(hook_length(p)**2 for p in partitions)
     expected = factorial(n)
-    print(f"n: {n}, Total from hook lengths: {total}, n!: {expected}")  # Debug print
     assert total == expected, f"Sum of hook lengths ({total}) does not equal {n}! ({expected}) for n={n}"
 
 
 if __name__ == '__main__':
     pytest.main()
+    

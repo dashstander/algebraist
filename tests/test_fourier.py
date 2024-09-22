@@ -124,8 +124,9 @@ def test_permutation_action(n):
             f"Permutation action failed for n={n}, shape={shape}"
         
 
-def test_sn_fft():
-    n = 5
+
+@pytest.mark.parametrize("n", [4, 5, 6])
+def test_sn_fft(n):
     f = generate_random_function(n)
     slow_ft = slow_sn_ft(f, n)
     fast_ft = sn_fft(f, n)
