@@ -6,7 +6,19 @@ import torch
 
 from algebraist.permutations import Permutation
 from algebraist.tableau import enumerate_standard_tableau, generate_partitions, hook_length
-from algebraist.utils import adj_trans_decomp, trans_to_one_line
+from algebraist.utils import adj_trans_decomp, cycle_to_one_line, trans_to_one_line
+
+
+def contiguous_cycle(n, i):
+    """ Generates a permutation (in cycle notation) of the form (i, i+1, ..., n)
+
+    These permutations represent 
+    """
+    if i == n - 1:
+        return tuple(range(n))
+    else:
+        cycle_rep = [tuple(range(i, n))] + [(j,) for j in reversed(range(i))]
+        return cycle_to_one_line([cyc for cyc in cycle_rep if len(cyc) > 0])
 
 
 class SnIrrep:
@@ -66,7 +78,6 @@ class SnIrrep:
         irrep = np.zeros((self.dim, self.dim))
         def fn(i, j):
             tableau = self.basis[i]
-            #print(tableau)
             if i == j:
                 d = tableau.transposition_dist(a, b)
                 return 1. / d
@@ -120,8 +131,7 @@ class SnIrrep:
         return torch.concatenate(tensors, dim=0).squeeze().to(device)
 
     def coset_rep_matrices(self, dtype=torch.float64):
-        coset_reps = [Permutation.transposition(self.n, i, self.n-1).sigma for i in range(self.n - 1)]
-        coset_reps +=  [Permutation.identity(self.n).sigma]
+        coset_reps = [Permutation(contiguous_cycle(self.n, i)).sigma for i in range(self.n)]
         return  [torch.from_numpy(self.matrix_representations[rep]).to(dtype) for rep in coset_reps]
     
     def alternating_matrix_tensor(self, dtype=torch.float64, device=torch.device('cpu')):
