@@ -83,8 +83,11 @@ def _inverse_fourier_projection(ft: torch.Tensor, irrep: SnIrrep):
     """
     
     matrices = irrep.matrix_tensor(ft.dtype, ft.device)
+    if ft.dim() < 2:
+        ft = ft.unsqueeze(0)
 
     if irrep.dim == 1:
+        print(ft.shape)
         result = torch.einsum('...i,g->...ig', ft, matrices).squeeze()
     else: 
         dim = irrep.dim
@@ -198,10 +201,8 @@ def slow_sn_ift(ft, n: int):
     """
     permutations = Permutation.full_group(n)
     group_order = len(permutations)
-    irreps = {shape: SnIrrep(n, shape).matrix_tensor() for shape in ft.keys()}
-    trivial_irrep = (n,)
-    sign_irrep = tuple([1] * n)
-
+    irreps = {shape: SnIrrep(n, shape) for shape in ft.keys()}
+    
     batch_size = ft[(n - 1, 1)].shape[0] if len(ft[(n - 1, 1)].shape) == 3 else None
     if batch_size is None:
         ift = torch.zeros((group_order,), device=ft[(n - 1, 1)].device)
@@ -209,13 +210,8 @@ def slow_sn_ift(ft, n: int):
         ift = torch.zeros((batch_size, group_order), device=ft[(n - 1, 1)].device)
     for shape, irrep_ft in ft.items():
         # Properly the formula says we should multiply by $rho(g^{-1})$, i.e. the transpose here
-        inv_rep = irreps[shape].to(irrep_ft.dtype).to(irrep_ft.device)
-        if shape == trivial_irrep or shape == sign_irrep:
-            ift += torch.einsum('...i,g->...ig', irrep_ft, inv_rep).squeeze()
-        else: 
-            dim = inv_rep.shape[-1] 
-            # But this contracts the tensors in the correct order without the transpose
-            ift += dim * torch.einsum('...ij,gij->...g', irrep_ft, inv_rep)
+        #inv_rep = irreps[shape].to(irrep_ft.dtype).to(irrep_ft.device)
+        ift += _inverse_fourier_projection(irrep_ft, irreps[shape])
     
     return (ift / group_order)
 
@@ -233,10 +229,7 @@ def slow_sn_fourier_decomposition(ft, n: int):
     """
     permutations = Permutation.full_group(n)
     group_order = len(permutations)
-    irreps = {shape: SnIrrep(n, shape).matrix_tensor() for shape in ft.keys()}
-    trivial_irrep = (n,)
-    sign_irrep = tuple([1] * n)
-
+    irreps = {shape: SnIrrep(n, shape) for shape in ft.keys()}
     num_irreps = len(ft.keys())
     batch_size = ft[(n - 1, 1)].shape[0] if len(ft[(n - 1, 1)].shape) == 3 else None
 
@@ -246,12 +239,9 @@ def slow_sn_fourier_decomposition(ft, n: int):
         ift = torch.zeros((num_irreps, batch_size, group_order), device=ft[(n - 1, 1)].device)
 
     for i, (shape, irrep_ft) in enumerate(ft.items()):
-        inv_rep = irreps[shape].to(irrep_ft.dtype).to(irrep_ft.device)
-        if shape == trivial_irrep or shape == sign_irrep:  # One-dimensional representation
-            ift[i] = torch.einsum('...i,g->...ig', irrep_ft, inv_rep).squeeze()
-        else:  # Higher-dimensional representation
-            dim = inv_rep.shape[-1] 
-            ift[i] += dim * torch.einsum('...ij,gij->...g', irrep_ft, inv_rep)
+        #inv_rep = irreps[shape].to(irrep_ft.dtype).to(irrep_ft.device)
+        ift[i] = _inverse_fourier_projection(irrep_ft, irreps[shape])
+        
     if batch_size is not None:
         ift = ift.permute(1, 0, 2)
     return (ift / group_order).squeeze()

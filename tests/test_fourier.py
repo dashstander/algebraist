@@ -44,7 +44,7 @@ def generate_random_function(n, batch_size=None):
 @pytest.mark.parametrize("batch_size", [None, 1, 5])
 def test_fourier_transform_invertibility(n, batch_size):
     f = generate_random_function(n, batch_size)
-    ft = slow_sn_ft(f, n)
+    ft = sn_fft(f, n)
     ift = slow_sn_ift(ft, n)
     f = f.squeeze()
     assert ift.shape == f.shape
@@ -71,7 +71,7 @@ def test_fourier_decomposition(n, batch_size):
 @pytest.mark.parametrize("batch_size", [None, 1, 5])
 def test_fourier_transform_norm_preservation(n, batch_size):
     f = generate_random_function(n, batch_size)
-    ft = slow_sn_ft(f, n)
+    ft = sn_fft(f, n)
     power = calc_power(ft, n)
     total_power = sum(p for p in power.values())
     if batch_size is None:
@@ -88,7 +88,7 @@ def test_convolution_theorem(n):
     # Compute convolution in group domain
     conv_group = convolve(g, f, n)
 
-    ft_conv_time = slow_sn_ft(conv_group, n)
+    ft_conv_time = sn_fft(conv_group, n)
     
     # Compute convolution in Fourier domain
     ft_f = sn_fft(f, n)
@@ -115,7 +115,7 @@ def test_permutation_action(n):
     permutation_action = [(perm.inverse * p).permutation_index() for p in permutations ]
     # Action in group domain
     f_perm = f[permutation_action]
-    ft_perm = slow_sn_ft(f_perm, n)
+    ft_perm = sn_fft(f_perm, n)
     
     # Action in Fourier domain
     ft_action = {}
