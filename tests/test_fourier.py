@@ -3,11 +3,20 @@ import math
 import numpy as np
 import pytest
 import torch
+import algebraist
 from algebraist.fourier import (
     slow_sn_ft, slow_sn_ift, slow_sn_fourier_decomposition, sn_fft, calc_power
 )
 from algebraist.permutations import Permutation
 from algebraist.irreps import SnIrrep
+
+
+@pytest.fixture
+def set_base_case():
+    original_base_case = algebraist.fourier.BASE_CASE
+    algebraist.fourier.BASE_CASE = 3
+    yield
+    algebraist.fourier.BASE_CASE = original_base_case
 
 
 def convolve(f, g, n):
@@ -58,7 +67,7 @@ def test_fourier_decomposition(n, batch_size):
     assert torch.allclose(f, reconstructed, atol=1e-5), f"Fourier decomposition failed for n={n}, batch_size={batch_size}"
 
 
-@pytest.mark.parametrize("n", [5, 6])
+@pytest.mark.parametrize("n", [3, 4, 5])
 @pytest.mark.parametrize("batch_size", [None, 1, 5])
 def test_fourier_transform_norm_preservation(n, batch_size):
     f = generate_random_function(n, batch_size)
@@ -70,7 +79,7 @@ def test_fourier_transform_norm_preservation(n, batch_size):
     assert torch.allclose(torch.sum(f**2, dim=1), total_power, atol=1e-5), f"Norm not preserved for n={n}, batch_size={batch_size}"
 
 
-@pytest.mark.parametrize("n", [5, 6])
+@pytest.mark.parametrize("n", [3, 4, 5])
 def test_convolution_theorem(n):
     f = generate_random_function(n, None).to(torch.float64)
     g = generate_random_function(n, None).to(torch.float64)
@@ -97,7 +106,7 @@ def test_convolution_theorem(n):
     
 
 
-@pytest.mark.parametrize("n", [5, 6])
+@pytest.mark.parametrize("n", [3, 4, 5])
 def test_permutation_action(n):
     f = generate_random_function(n, None)
     ft = sn_fft(f, n)
@@ -127,7 +136,7 @@ def test_permutation_action(n):
         
 
 
-@pytest.mark.parametrize("n", [5, 6, 7])
+@pytest.mark.parametrize("n", [3, 4, 5])
 def test_sn_fft(n):
     f = generate_random_function(n)
     slow_ft = slow_sn_ft(f, n)
