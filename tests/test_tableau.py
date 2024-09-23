@@ -81,6 +81,7 @@ def test_hook_length_known_values():
     assert hook_length((3, 2)) == 5
     assert hook_length((3, 1, 1)) == 6
     assert hook_length((5, 4, 1)) == 288
+    assert hook_length((4, 3, 2, 1)) == 768
 
 
 def test_generate_partitions():

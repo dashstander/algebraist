@@ -68,36 +68,27 @@ def generate_standard_young_tableaux(shape: tuple[int]) -> list[list[list[int]]]
 
     return backtrack(shape, n)
 
-
 @cache
-def _generate_partitions(n):
-    match n:
-        case 5:
-            partitions = [(5,), (4, 1), (3, 2), (3, 1, 1), (2, 2, 1), (2, 1, 1, 1), (1, 1, 1, 1, 1)]
-        case 4:
-            partitions = [(4,), (3, 1), (2, 2), (2, 1, 1), (1, 1, 1, 1)]
-        case  3:
-            partitions = [(3,), (2, 1), (1, 1, 1)]
-        case 2:
-            partitions = [(2,), (1, 1)]
-        case 1:
-            partitions = [(1,)]
-        case  0:
-            return ()
-        case _:
-            partitions = [(n,)]
-            for k in range(n):
-                m = n - k
-                partitions.extend(
-                    tuple(
-                        sorted((m, *p), reverse=True)
-                    ) for p in _generate_partitions(k)
-                )
-    return partitions
-
-
 def generate_partitions(n):
-    return sorted(list(set(_generate_partitions(n))))
+    if n <= 5:
+        return {
+            0: [],
+            1: [(1,)],
+            2: [(2,), (1, 1)],
+            3: [(3,), (2, 1), (1, 1, 1)],
+            4: [(4,), (3, 1), (2, 2), (2, 1, 1), (1, 1, 1, 1)],
+            5: [(5,), (4, 1), (3, 2), (3, 1, 1), (2, 2, 1), (2, 1, 1, 1), (1, 1, 1, 1, 1)],
+            6: [(6,), (5, 1), (4, 2), (4, 1, 1), (3, 3), (3, 2, 1), (3, 1, 1, 1), (2, 1, 1, 1, 1), (1, 1, 1, 1, 1, 1)]
+        }[n]
+    
+    partitions = [(n,)]
+    for k in range(1, n):
+        for p in generate_partitions(n - k):
+            new_partition = tuple(sorted((k, *p), reverse=True))
+            if new_partition not in partitions:
+                partitions.append(new_partition)
+    
+    return partitions
 
 
 def conjugate_partition(partition):
