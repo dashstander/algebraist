@@ -1,9 +1,9 @@
-from copy import deepcopy
+from collections import deque
 from functools import cache, total_ordering, reduce
 from itertools import chain
 from math import factorial
 from operator import mul
-
+from typing import Iterator
 
 
 def check_partition_shape(partition_shape):
@@ -21,57 +21,78 @@ def check_partition_shape(partition_shape):
     return True
 
 
+def youngs_lattice_covering_relation(partition: tuple[int]) -> list[tuple[int]]:
+    children = []
+    for i in range(len(partition)):
+        if partition[i] > (partition[i+1] if i+1 < len(partition) else 0):
+            child = list(partition)
+            child[i] -= 1
+            if child[-1] == 0:
+                child.pop()
+            children.append(tuple(child))
+    return children
 
-def _subpartitions(part):
-    assert len(part) >= 2
-    new_parts = []
-    if part[0] == 1:
-        yield part
-    part = list(part)
-    for i in range(len(part) - 1):
-        currval = part[i]
-        nextval = part[i+1]
-        if (currval - nextval) > 1:
-            new_part = deepcopy(part)
-            new_part[i] = currval - 1
-            new_part[i + 1] = nextval + 1
-            new_parts.append(tuple(new_part))
-        if currval > 1 and nextval == 1:
-            new_part = deepcopy(part)
-            new_part[i] = currval - 1
-            new_part.append(1)
-            new_parts.append(tuple(new_part))
-    if part[-1] > 1:
-        new_part = deepcopy(part)
-        lastval = new_part[-1]
-        new_part[-1] = lastval - 1
-        new_part.append(1)
-        new_parts.append(tuple(new_part))
-    for subpart in new_parts:
-        yield subpart
-        for subsub in _subpartitions(subpart):
-            yield subsub
+
+def youngs_lattice_down(top_partition: tuple[int]) -> dict[tuple[int], list[tuple[int]]]:
+    lattice = {}
+    queue = deque([top_partition])
+    while queue:
+        partition = queue.popleft()
+        children = youngs_lattice_covering_relation(partition)
+        lattice[partition] = children
+        for child in children:
+            if child not in lattice:
+                queue.append(child)
+    return lattice
+
+
+def generate_standard_young_tableaux(shape: tuple[int]) -> list[list[list[int]]]:
+    n = sum(shape) - 1  # Adjust for 0-indexing
+    lattice = youngs_lattice_down(shape)
+
+    def backtrack(partition: tuple[int], value: int) -> Iterator[list[list[int]]]:
+        if partition == (1,):
+            yield [[0]]
+        
+        for child_partition in lattice[partition]:
+            child_tableaux = backtrack(child_partition, value - 1)
+            for tableau in child_tableaux:
+                new_tableau = [row[:] for row in tableau]
+                for i, (parent_count, child_count) in enumerate(zip(partition, child_partition + (0,))):
+                    if parent_count > child_count:
+                        if i >= len(new_tableau):
+                            new_tableau.append([])
+                        new_tableau[i].append(value)
+                        yield new_tableau
+                        break
+
+    return backtrack(shape, n)
 
 
 @cache
 def _generate_partitions(n):
-    if n == 3:
-        partitions = [(3,), (2, 1), (1, 1, 1)]
-    elif n == 2:
-        partitions = [(2,), (1, 1)]
-    elif n == 1:
-        partitions = [(1,)]
-    elif n == 0:
-        return ()
-    else:
-        partitions = [(n,)]
-        for k in range(n):
-            m = n - k
-            partitions.extend(
-                tuple(
-                    sorted((m, *p), reverse=True)
-                ) for p in _generate_partitions(k)
-            )
+    match n:
+        case 5:
+            partitions = [(5,), (4, 1), (3, 2), (3, 1, 1), (2, 2, 1), (2, 1, 1, 1), (1, 1, 1, 1, 1)]
+        case 4:
+            partitions = [(4,), (3, 1), (2, 2), (2, 1, 1), (1, 1, 1, 1)]
+        case  3:
+            partitions = [(3,), (2, 1), (1, 1, 1)]
+        case 2:
+            partitions = [(2,), (1, 1)]
+        case 1:
+            partitions = [(1,)]
+        case  0:
+            return ()
+        case _:
+            partitions = [(n,)]
+            for k in range(n):
+                m = n - k
+                partitions.extend(
+                    tuple(
+                        sorted((m, *p), reverse=True)
+                    ) for p in _generate_partitions(k)
+                )
     return partitions
 
 
@@ -153,8 +174,6 @@ class YoungTableau:
         else:
             return self_n_index < other_n_index
         
-        
-    
     def restrict(self):
         return YoungTableau([[v for v in row if v != self.n - 1] for row in self.values])
     
@@ -181,49 +200,14 @@ class YoungTableau:
         return hash(str(self.values))
 
 
-def _enumerate_next_placements(unfinished_syt):
-    indices = []
-    for i, row in enumerate(unfinished_syt):
-        for j, el in enumerate(row):
-            if el >= 0:
-                continue
-            elif (i == 0) or (unfinished_syt[i-1][j] >= 0):
-                indices.append((i, j))
-                break
-    return indices
-
-
-def _fill_unfinished_tableau(tableau, numbers):
-    possible_placements = _enumerate_next_placements(tableau)
-    val = numbers.pop()
-    new_tableaus = []
-    for i, j in possible_placements:
-        new_tableau = deepcopy(tableau)
-        new_tableau[i][j] = val
-        new_tableaus.append(new_tableau)
-    if len(numbers) == 0:
-        return [YoungTableau(t) for t in new_tableaus]
-    else:
-        all_tableaus = []
-        for t in new_tableaus:
-            all_tableaus += _fill_unfinished_tableau(t, deepcopy(numbers))
-        return all_tableaus
-
-
-@cache
 def enumerate_standard_tableau(partition_shape: tuple[int]) -> list[YoungTableau]:
     if not check_partition_shape(partition_shape):
         raise ValueError(f'Shape {partition_shape} is not a valid partition.')
-    n = sum(partition_shape)
-    if n == 1:
-        return [YoungTableau([[0]])]
-    base_tableau = [[-1] * length for length in partition_shape]
-    numbers = list(range(n))
-    numbers.reverse()
-    base_tableau[0][0] = numbers.pop()
-    all_tableaus = _fill_unfinished_tableau(base_tableau, numbers)
-    return sorted(all_tableaus)
-
+    
+    return sorted([
+        YoungTableau(tableau) 
+        for tableau in generate_standard_young_tableaux(partition_shape)
+    ])
 
 
 def hook_length(partition):

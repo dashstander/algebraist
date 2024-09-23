@@ -1,3 +1,4 @@
+from copy import deepcopy
 from functools import lru_cache
 from itertools import pairwise, permutations
 import torch
@@ -63,3 +64,24 @@ def trans_to_one_line(i: int, j: int, n: int):
     sigma[i] = j
     sigma[j] = i
     return tuple(sigma)
+
+
+def youngs_lattice_covering_relation(partition: tuple[int]) -> list[tuple[int]]:
+    children = []
+    k = len(partition)
+    for i in range(k - 1):
+        # check if valid subrepresentation
+        if partition > partition[i+1]:
+            # if so, copy, modify, and append to list
+            child = list(deepcopy(partition))
+            child[i] -= 1
+            children.append(tuple(child))
+    # the last subrep
+    child = list(deepcopy(partition))
+    if partition[-1] > 1:
+        child[-1] -= 1
+    else:
+    # removing last element of partition if it’s a 1
+        del child[-1]
+    children.append(tuple(child))
+    return sorted(children)
