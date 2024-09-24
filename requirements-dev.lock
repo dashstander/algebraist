@@ -4,7 +4,7 @@
 # last locked with the following flags:
 #   pre: false
 #   features: []
-#   all-features: false
+#   all-features: true
 #   with-sources: false
 #   generate-hashes: false
 #   universal: false
@@ -57,7 +57,7 @@ executing==2.1.0
     # via stack-data
 fastjsonschema==2.20.0
     # via nbformat
-filelock==3.16.0
+filelock==3.16.1
     # via torch
 fqdn==1.5.1
     # via jsonschema
@@ -239,7 +239,7 @@ soupsieve==2.6
     # via beautifulsoup4
 stack-data==0.6.3
     # via ipython
-sympy==1.13.2
+sympy==1.13.3
     # via torch
 terminado==0.18.1
     # via jupyter-server

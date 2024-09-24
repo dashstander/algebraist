@@ -4,13 +4,13 @@ A PyTorch implementation of the [Clausen & Baum (1993)](https://www.ams.org/jour
 
 ## Introduction
 
-The Fourier transform is a fundamental tool in signal processing and analysis, typically associated with continuous or discrete time signals. However, the concept can be generalized to other mathematical structures, including finite groups. This project implements the Fast Fourier Transform for the symmetric group Sn, which has applications in various fields including computational group theory, machine learning, and data analysis on permutations.
+The Fourier transform is a fundamental tool in signal processing and analysis, typically associated with continuous or discrete time signals. However, the concept can be generalized to other mathematical structures, including finite groups. This project implements the Fast Fourier Transform for the symmetric group $S_n$, which has applications in various fields including computational group theory, machine learning, and data analysis on permutations.
 
 ## Features
 
-- Efficient implementation of the Sn FFT algorithm in PyTorch
+- Efficient implementation of the $S_n$ FFT algorithm in PyTorch
 - Support for both forward and inverse transforms.
-- Utilities for working with permutations and representations of Sn
+- Utilities for working with permutations and representations of $S_n$
 - Examples and tests demonstrating usage and correctness
 
 ## Installation
