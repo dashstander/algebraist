@@ -4,7 +4,7 @@
 # last locked with the following flags:
 #   pre: false
 #   features: []
-#   all-features: false
+#   all-features: true
 #   with-sources: false
 #   generate-hashes: false
 #   universal: false
@@ -12,7 +12,7 @@
 -e file:.
 einops==0.8.0
     # via algebraist
-filelock==3.16.0
+filelock==3.16.1
     # via torch
 fsspec==2024.9.0
     # via torch
@@ -26,7 +26,7 @@ networkx==3.3
     # via torch
 numpy==2.1.1
     # via algebraist
-sympy==1.13.2
+sympy==1.13.3
     # via torch
 torch==2.4.1
     # via algebraist
