@@ -1,15 +1,19 @@
 # Fast Fourier Transform for Sn
 
-A PyTorch implementation of the [Clausen & Baum (1993)](https://www.ams.org/journals/mcom/1993-61-204/S0025-5718-1993-1192969-X/S0025-5718-1993-1192969-X.pdf) Fast Fourier Transform (FFT) for the symmetric group $S_n$.
+A PyTorch implementation of the [Clausen & Baum (1993)](https://www.ams.org/journals/mcom/1993-61-204/S0025-5718-1993-1192969-X/S0025-5718-1993-1192969-X.pdf) Fast Fourier Transform (FFT) for the [symmetric group](https://en.wikipedia.org/wiki/Symmetric_group) $S_n$.
 
 ## Introduction
 
-The Fourier transform is a fundamental tool in signal processing and analysis, typically associated with continuous or discrete time signals. However, the concept can be generalized to other mathematical structures, including finite groups. This project implements the Fast Fourier Transform for the symmetric group $S_n$, which has applications in various fields including computational group theory, machine learning, and data analysis on permutations.
+The Fourier transform is a fundamental tool in signal processing and analysis, typically associated with continuous or discrete time signals. The concept can be generalized to other mathematical structures, however, including [finite groups](https://en.wikipedia.org/wiki/Fourier_transform_on_finite_groups). The classical discrete Fourier transform can be thought of as a transform on the [cyclic group](https://en.wikipedia.org/wiki/Cyclic_group) $C_n$, with $n$ the number of time samples in the signal. The frequencies that the Fourier transfrom maps to are the [characters](https://en.wikipedia.org/wiki/Character_theory) of $C_t$.
+
+This project implements the Fast Fourier Transform for the symmetric group $S_n$, which is the group of permutations on $n$ letters. e.g. the permutation $(3, 2, 1, 4, 5)$ acts on an sequence of five letters by permuting the first and third elements: $(3, 2, 1, 4, 5) \circ [a, b, c, d, e] = [c, b, a, d, e]$.
+
+Analyzing data on the symmetric group has applications in many fields including [probability](https://projecteuclid.org/ebooks/institute-of-mathematical-statistics-lecture-notes-monograph-series/group-representations-in-probability-and-statistics/toc/10.1214/lnms/1215467407), machine learning, and data analysis on permutations.
 
 ## Features
 
 - Efficient implementation of the $S_n$ FFT algorithm in PyTorch
-- Support for both forward and inverse transforms.
+- Support for both (fast) forward and (slow right now) inverse transforms.
 - Utilities for working with permutations and representations of $S_n$
 - Examples and tests demonstrating usage and correctness
 
