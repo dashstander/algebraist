@@ -149,7 +149,7 @@ def fourier_projection(fn_vals: torch.Tensor, irrep: SnIrrep) -> torch.Tensor:
 
     An important invariant of this function is that fn_vals is either 1D of shape (n!,) or 2D of shape (batch, n!).
 
-    This function is, however, called recursively and the tensor `fn_vals` will not always be 1 or 2D depending on the depth of recursion and whether or not it started with a batch dimension.
+    This function is, however, called recursively and throughout computation `fn_vals` will not always be 1 or 2D depending on the depth of recursion and whether or not it started with a batch dimension.
 
     Given fn_vals on S_n, we will reshape it to have shape (n, (n-1)!), where each ((n-1)!,) is thought of as its own function on S_{n-1}. This is passed down to `fourier_projection` **as if `n` is the batch dimension**.
 
