@@ -2,9 +2,10 @@ from copy import deepcopy
 from functools import lru_cache
 from itertools import pairwise, permutations
 import torch
+from typing import Sequence
 
 
-def adj_trans_decomp(i: int, j: int) -> list[tuple[int]]:
+def adj_trans_decomp(i: int, j: int) -> Sequence[tuple[int, ...]]:
     """
     Given two integers, i < j, gives a sequences of adjacent transpositions that when composed transpose i and j
     Args:
@@ -20,7 +21,7 @@ def adj_trans_decomp(i: int, j: int) -> list[tuple[int]]:
 
 
 
-def cycle_to_one_line(cycle_rep: list[tuple[int]]) -> tuple[int]:
+def cycle_to_one_line(cycle_rep: list[tuple[int, ...]]) -> tuple[int, ...]:
     """
     Given a permutation in cycle representation where (i, j, k) means that i -> j, j -> k, and k -> i, this returns the permutation in one-line notation.
     Args:
@@ -48,7 +49,7 @@ def generate_all_permutations(n: int) -> torch.Tensor:
     return torch.tensor(list(permutations(range(n))), dtype=torch.int64)
 
 
-def trans_to_one_line(i: int, j: int, n: int):
+def trans_to_one_line(i: int, j: int, n: int) -> tuple[int, ...]:
     """
     Helper function to create a permutation that is the transposition of two elements.
     Required that i < j < n
@@ -66,7 +67,7 @@ def trans_to_one_line(i: int, j: int, n: int):
     return tuple(sigma)
 
 
-def youngs_lattice_covering_relation(partition: tuple[int]) -> list[tuple[int]]:
+def youngs_lattice_covering_relation(partition: tuple[int, ...]) -> list[tuple[int, ...]]:
     children = []
     k = len(partition)
     for i in range(k - 1):

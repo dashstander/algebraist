@@ -2,17 +2,17 @@ from copy import deepcopy
 from functools import cached_property, reduce
 from itertools import combinations, pairwise
 import numpy as np
+from numpy.typing import ArrayLike
 import torch
+from typing import Iterator, Self
 
 from algebraist.permutations import Permutation
-from algebraist.tableau import enumerate_standard_tableau, generate_partitions, hook_length
+from algebraist.tableau import enumerate_standard_tableau, generate_partitions, hook_length, YoungTableau
 from algebraist.utils import adj_trans_decomp, cycle_to_one_line, trans_to_one_line
 
 
-def contiguous_cycle(n, i):
+def contiguous_cycle(n: int, i: int):
     """ Generates a permutation (in cycle notation) of the form (i, i+1, ..., n)
-
-    These permutations represent 
     """
     if i == n - 1:
         return tuple(range(n))
@@ -23,31 +23,31 @@ def contiguous_cycle(n, i):
 
 class SnIrrep:
 
-    def __init__(self, n: int, partition: tuple[int]):
+    def __init__(self, n: int, partition: tuple[int, ...]):
         self.n = n
         self.shape = partition
         self.dim = hook_length(self.shape)
         self.permutations = Permutation.full_group(n)
 
     @staticmethod
-    def generate_all_irreps(n: int):
+    def generate_all_irreps(n: int) -> Iterator[Self]:
         for partition in generate_partitions(n):
             yield SnIrrep(n, partition)
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         return self.shape == other.shape
     
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(str(self.shape))
     
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'S{self.n} Irrep: {self.shape}'
     
     @cached_property
-    def basis(self):
+    def basis(self) -> list[YoungTableau]:
         return sorted(enumerate_standard_tableau(self.shape))
 
-    def split_partition(self):
+    def split_partition(self) -> list[tuple[int, ...]]:
         new_partitions = []
         k = len(self.shape)
         for i in range(k - 1):
@@ -67,13 +67,13 @@ class SnIrrep:
         new_partitions.append(tuple(partition))
         return sorted(new_partitions)
 
-    def adjacent_transpositions(self):
+    def adjacent_transpositions(self) -> list[tuple[int, int]]:
         return pairwise(range(self.n))
     
-    def non_adjacent_transpositions(self):
-        return [(i, j) for i, j in combinations(range(self.n), 2) if i+1 != j]
+    def non_adjacent_transpositions(self) -> list[tuple[int, int]]:
+        return [(i, j) for i, j in combinations(range(self.n), 2) if i + 1 != j]
 
-    def adj_transposition_matrix(self, a, b):
+    def adj_transposition_matrix(self, a: int, b: int) -> ArrayLike:
         perm = Permutation.transposition(self.n, a, b)
         irrep = np.zeros((self.dim, self.dim))
         def fn(i, j):
@@ -93,7 +93,7 @@ class SnIrrep:
                 irrep[x, y] = fn(x, y)
         return irrep
     
-    def generate_transposition_matrices(self):
+    def generate_transposition_matrices(self) -> dict[tuple[int], ArrayLike]:
         matrices = {
             (i, j): self.adj_transposition_matrix(i, j) for i, j in self.adjacent_transpositions()
         }
@@ -103,7 +103,7 @@ class SnIrrep:
         return matrices
 
     @cached_property
-    def matrix_representations(self):
+    def matrix_representations(self) -> dict[tuple[int], ArrayLike]:
         transpo_matrices = self.generate_transposition_matrices()
         matrices = {
             trans_to_one_line(*k, self.n): v for k, v in transpo_matrices.items()
@@ -123,14 +123,14 @@ class SnIrrep:
         self._matrices = matrices
         return matrices
 
-    def matrix_tensor(self, dtype=torch.float64, device=torch.device('cpu')):
+    def matrix_tensor(self, dtype=torch.float64, device=torch.device('cpu')) -> torch.Tensor:
         tensors = [
             torch.from_numpy(self.matrix_representations[perm.sigma]).unsqueeze(0).to(dtype)
             for perm in self.permutations
         ]
         return torch.concatenate(tensors, dim=0).squeeze().to(device)
 
-    def coset_rep_matrices(self, dtype=torch.float64):
+    def coset_rep_matrices(self, dtype=torch.float64) -> list[torch.Tensor]:
         coset_reps = [Permutation(contiguous_cycle(self.n, i)).sigma for i in range(self.n)]
         return  [torch.from_numpy(self.matrix_representations[rep]).to(dtype) for rep in coset_reps]
     

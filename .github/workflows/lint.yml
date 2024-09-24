@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
-   - name: Python Setup Rye
+    - name: Python Setup Rye
       uses: eifinger/setup-rye@v4.2.4
       with:
         enable-cache: true

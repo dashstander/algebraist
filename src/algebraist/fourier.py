@@ -13,8 +13,40 @@ BASE_CASE = 5
 
 
 @lru_cache(maxsize=20)
-def get_all_irreps(n):
+def get_all_irreps(n: int) -> list[SnIrrep]:
+    """
+    Collects a list of all of the irreducible representations (irreps) of S_n.
+
+    Helper method so we don't end up calling this a ton.
+
+    Args:
+    n (int): the number of elements on which the permutations of S_n acts
+
+    Returns:
+    list[SnIrrep] all of the irreps of S_n, indexed by the interger partitions of n
+    """
     return [SnIrrep(n, p) for p in generate_partitions(n)]
+
+
+def sn_minus_1_coset(tensor: torch.Tensor, sn_perms: torch.Tensor, idx: int) -> torch.Tensor:
+    """
+    Returns the values that a function on S_n takes on of one of the cosets of S_{n-1} < S_n
+
+    There are n cosets of S_{n-1} < S_n. Young's Orthogonal Form (YOR) is specifically adapted to the copy of S_{n-1} where the element n is fixed in the nth position. The _cosets_ of this subgroup correspond to the elements that all have n in a given position.
+
+    Args:
+    tensor (torch.Tensor): The function on S_n we are working with, either shape (batch, n!) or (n!,)
+    sn_perms (torch.Tensor): A tensor-version of S_n with shape (n!, n), each row is the elements 0..n-1 permuted, and the rows are in lexicographic order
+    idx (int): The index of n that defines the coset we are grabbing
+
+    Returns:
+    torch.Tensor either of shape (batch, (n-1)!) or ((n-1)!, ), depending on whether or not tensor had a batch dimension
+    """
+    n = sn_perms.shape[1]
+    fixed_element = n - 1
+    coset_idx = torch.argwhere(sn_perms[:, idx] == fixed_element).squeeze()
+    return tensor[..., coset_idx]
+ 
 
 
 def slow_sn_ft(fn_vals: torch.Tensor, n: int):
@@ -98,16 +130,6 @@ def _inverse_fourier_projection(ft: torch.Tensor, irrep: SnIrrep):
     return result
 
 
-def sn_minus_1_coset(tensor: torch.Tensor, sn_perms: torch.Tensor, idx: int) -> torch.Tensor:
-    """
-    We adapt the basis 
-    """
-    n = sn_perms.shape[1]
-    fixed_element = n - 1
-    coset_idx = torch.argwhere(sn_perms[:, idx] == fixed_element).squeeze()
-    return tensor[..., coset_idx]
- 
-
 def fourier_projection(fn_vals: torch.Tensor, irrep: SnIrrep) -> torch.Tensor:
     """
     Fast projection of a function on S_n (given as a pytorch tensor) onto one of the irreducible representations (irreps) of S_n. If n > 5 then
@@ -164,17 +186,6 @@ def fourier_projection(fn_vals: torch.Tensor, irrep: SnIrrep) -> torch.Tensor:
         result = result.squeeze(0) 
       
     return result
-
-
-def inverse_fourier_projection(ft: torch.Tensor, irrep: SnIrrep):
-    """
-    """
-    if irrep.n <= BASE_CASE or irrep.dim == 1:
-        return _inverse_fourier_projection(ft, irrep)
-    
-    coset_rep_matrices = torch.stack([mat.T for mat in irrep.coset_rep_matrices(ft.dtype, ft.device)]).unsqueeze(0)
-
-
 
 
 def sn_fft(fn_vals: torch.Tensor, n: int, verbose=False) -> dict[tuple[int, ...], torch.Tensor]:    

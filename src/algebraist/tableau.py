@@ -3,14 +3,14 @@ from functools import cache, total_ordering, reduce
 from itertools import chain
 from math import factorial
 from operator import mul
-from typing import Iterator
+from typing import Iterator, Sequence
 
 
-def check_partition_shape(partition_shape):
+def check_partition_shape(partition_shape: tuple[int, ...]) -> bool:
     """
     Checks that a given shape defines a correct partition, in particular that is in decreasing order.
     Args:
-        partition_shape (tuple[int]): the partition of n
+        partition_shape (tuple[int, ...]): the partition of n
     Returns:
         bool True if valid, False otherwise
     """
@@ -21,7 +21,16 @@ def check_partition_shape(partition_shape):
     return True
 
 
-def youngs_lattice_covering_relation(partition: tuple[int]) -> list[tuple[int]]:
+def youngs_lattice_covering_relation(partition: tuple[int, ...]) -> list[tuple[int, ...]]:
+    """
+    Takes a partition and returns a list of the partitions directly below it in Young's lattice.
+
+    Args:
+        partititon (tuple[int, ...]): an integer partition of n
+    
+    Returns:
+        list[tuple[int, ...]] all of the partitions directly beneath partition
+    """
     children = []
     for i in range(len(partition)):
         if partition[i] > (partition[i+1] if i+1 < len(partition) else 0):
@@ -33,7 +42,10 @@ def youngs_lattice_covering_relation(partition: tuple[int]) -> list[tuple[int]]:
     return children
 
 
-def youngs_lattice_down(top_partition: tuple[int]) -> dict[tuple[int], list[tuple[int]]]:
+def youngs_lattice_down(top_partition: tuple[int, ...]) -> dict[tuple[int, ...], list[tuple[int, ...]]]:
+    """
+    Generate the sub-lattice of Young's lattice from top_partition to (1,)
+    """
     lattice = {}
     queue = deque([top_partition])
     while queue:
@@ -46,8 +58,13 @@ def youngs_lattice_down(top_partition: tuple[int]) -> dict[tuple[int], list[tupl
     return lattice
 
 
-def generate_standard_young_tableaux(shape: tuple[int]) -> list[list[list[int]]]:
-    n = sum(shape) - 1  # Adjust for 0-indexing
+def generate_standard_young_tableaux(shape: tuple[int, ...]) -> list[list[list[int]]]:
+    """
+    A standard Young Tableau is a filling of a tableau lambda with the values 0...n-1 where the values are increasing from left to right in each row and top to bottom in each column. This function generates all of them for a given shape.
+
+    The standard Young Tableau for a given partition lambda are one-to-one with chains in the sub-lattice of Young's lattice from [(1,), lambda]. Here we generate the sub-lattice and then generate each chain.
+    """
+    n = sum(shape) - 1
     lattice = youngs_lattice_down(shape)
 
     def backtrack(partition: tuple[int], value: int) -> Iterator[list[list[int]]]:
@@ -68,8 +85,9 @@ def generate_standard_young_tableaux(shape: tuple[int]) -> list[list[list[int]]]
 
     return backtrack(shape, n)
 
+
 @cache
-def generate_partitions(n):
+def generate_partitions(n: int) -> Sequence[tuple[int, ...]]:
     if n <= 5:
         return {
             0: [],
@@ -91,7 +109,7 @@ def generate_partitions(n):
     return partitions
 
 
-def conjugate_partition(partition):
+def conjugate_partition(partition: tuple[int, ...]) -> tuple[int, ...]:
     n = sum(partition)
     conj_part = []
     for i in range(n):
@@ -109,13 +127,13 @@ class YoungTableau:
         self.shape = tuple([len(row) for row in values])
         self.n = sum(self.shape)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         strrep = []
         for row in self.values:
             strrep.append('|' + '|'.join([str(v) for v in row]) + '|' )
         return '\n'.join(strrep)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.n
     
     def __getitem__(self, key):
@@ -126,7 +144,7 @@ class YoungTableau:
         i, j = key
         self.values[i][j] = value
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if not isinstance(other, YoungTableau):
             other = YoungTableau(other)
         if (self.n != other.n) or (self.shape != other.shape):
@@ -136,7 +154,7 @@ class YoungTableau:
                 return False
         return True
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         """Define a custom ordering for Young tableaux consistent with restrictions.
 
         !!!!! A SHOCKINGLY IMPORTANT METHOD !!!!!
@@ -172,7 +190,7 @@ class YoungTableau:
         """Return the shape of the tableau after removing the largest number."""
         return tuple([tuple([v for v in row if v != self.n - 1]) for row in self.values])
 
-    def index(self, val):
+    def index(self, val: int) -> tuple[int, ...]:
         for r, row in enumerate(self.values):
             if val in row:
                 c = row.index(val)
@@ -187,11 +205,11 @@ class YoungTableau:
         col_dist = col_y - col_x
         return row_dist + col_dist
     
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(str(self.values))
 
 
-def enumerate_standard_tableau(partition_shape: tuple[int]) -> list[YoungTableau]:
+def enumerate_standard_tableau(partition_shape: tuple[int, ...]) -> list[YoungTableau]:
     if not check_partition_shape(partition_shape):
         raise ValueError(f'Shape {partition_shape} is not a valid partition.')
     
@@ -201,7 +219,7 @@ def enumerate_standard_tableau(partition_shape: tuple[int]) -> list[YoungTableau
     ])
 
 
-def hook_length(partition):
+def hook_length(partition: tuple[int, ...]) -> int:
     """
     Calculate the number of standard Young tableaux for a given partition
     using the hook length formula.
