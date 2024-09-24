@@ -3,14 +3,14 @@ from functools import cache, total_ordering, reduce
 from itertools import chain
 from math import factorial
 from operator import mul
-from typing import Iterator, Self, Sequence
+from typing import Iterator, Sequence
 
 
 def check_partition_shape(partition_shape: tuple[int, ...]) -> bool:
     """
     Checks that a given shape defines a correct partition, in particular that is in decreasing order.
     Args:
-        partition_shape (tuple[int]): the partition of n
+        partition_shape (tuple[int, ...]): the partition of n
     Returns:
         bool True if valid, False otherwise
     """
@@ -22,6 +22,15 @@ def check_partition_shape(partition_shape: tuple[int, ...]) -> bool:
 
 
 def youngs_lattice_covering_relation(partition: tuple[int, ...]) -> list[tuple[int, ...]]:
+    """
+    Takes a partition and returns a list of the partitions directly below it in Young's lattice.
+
+    Args:
+        partititon (tuple[int, ...]): an integer partition of n
+    
+    Returns:
+        list[tuple[int, ...]] all of the partitions directly beneath partition
+    """
     children = []
     for i in range(len(partition)):
         if partition[i] > (partition[i+1] if i+1 < len(partition) else 0):
@@ -34,6 +43,9 @@ def youngs_lattice_covering_relation(partition: tuple[int, ...]) -> list[tuple[i
 
 
 def youngs_lattice_down(top_partition: tuple[int, ...]) -> dict[tuple[int, ...], list[tuple[int, ...]]]:
+    """
+    Generate the sub-lattice of Young's lattice from top_partition to (1,)
+    """
     lattice = {}
     queue = deque([top_partition])
     while queue:
@@ -47,7 +59,12 @@ def youngs_lattice_down(top_partition: tuple[int, ...]) -> dict[tuple[int, ...],
 
 
 def generate_standard_young_tableaux(shape: tuple[int, ...]) -> list[list[list[int]]]:
-    n = sum(shape) - 1  # Adjust for 0-indexing
+    """
+    A standard Young Tableau is a filling of a tableau lambda with the values 0...n-1 where the values are increasing from left to right in each row and top to bottom in each column. This function generates all of them for a given shape.
+
+    The standard Young Tableau for a given partition lambda are one-to-one with chains in the sub-lattice of Young's lattice from [(1,), lambda]. Here we generate the sub-lattice and then generate each chain.
+    """
+    n = sum(shape) - 1
     lattice = youngs_lattice_down(shape)
 
     def backtrack(partition: tuple[int], value: int) -> Iterator[list[list[int]]]:
@@ -67,6 +84,7 @@ def generate_standard_young_tableaux(shape: tuple[int, ...]) -> list[list[list[i
                         break
 
     return backtrack(shape, n)
+
 
 @cache
 def generate_partitions(n: int) -> Sequence[tuple[int, ...]]:
@@ -165,7 +183,7 @@ class YoungTableau:
         else:
             return self_n_index < other_n_index
         
-    def restrict(self) -> YoungTableau:
+    def restrict(self):
         return YoungTableau([[v for v in row if v != self.n - 1] for row in self.values])
     
     def restricted_shape(self) -> tuple[int, ...]:
