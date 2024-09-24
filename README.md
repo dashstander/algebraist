@@ -42,6 +42,14 @@ ft = sn_fft(fn, n)
 # ft is now a dictionary mapping partitions to their Fourier transforms
 ```
 
+## Requirements
+
+So far `algebraist` has been developed with Python 3.11 and PyTorch 2.4 and I cannot promise that it will work with any other versions. Though the only new-ish feature that the library uses often is `torch.vmap`, so any PyTorch version that has merged in `functorch` _should_ work.
+
+
+## License
+This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a pull Request.
