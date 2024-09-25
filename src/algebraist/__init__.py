@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from algebraist.fourier import sn_fft
+from algebraist.fourier import sn_fft, sn_ifft, sn_fourier_decomposition, calc_power
 
 
-__all__ = ['sn_fft']
+__all__ = ['sn_fft', 'sn_ifft', 'sn_fourier_decomposition', 'calc_power']

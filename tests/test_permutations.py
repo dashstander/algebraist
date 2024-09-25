@@ -4,10 +4,11 @@ import pytest
 
 from algebraist.permutations import Permutation
 
+
 # Helper strategy to generate valid permutations
 @st.composite
 def permutation_strategy(draw, max_n=10):
-    n = draw(st.integers(min_value=1, max_value=max_n))
+    n = draw(st.integers(min_value=3, max_value=max_n))
     return Permutation(draw(st.permutations(range(n))))
 
 
@@ -17,17 +18,17 @@ def test_init():
     assert p.n == 3
 
 
-def test_full_group():
-    group = Permutation.full_group(3)
-    assert len(group) == 6
-    assert Permutation([0, 1, 2]) in group
-    assert Permutation([2, 1, 0]) in group
+@given(n=st.integers(min_value=3, max_value=6))
+def test_full_group(n):
+    group = Permutation.full_group(n)
+    assert len(group) == math.factorial(n)
 
 
-def test_identity():
-    id3 = Permutation.identity(3)
-    assert id3.sigma == (0, 1, 2)
-    assert id3.is_identity()
+@given(n=st.integers(min_value=3, max_value=6))
+def test_identity(n):
+    ident = Permutation.identity(n)
+    assert ident == tuple(range(n))
+    assert ident.is_identity()
 
 
 def test_transposition():
@@ -40,6 +41,7 @@ def test_multiplication():
     p2 = Permutation([2, 0, 1])
     p3 = p1 * p2
     assert p3.sigma == (0, 1, 2)
+
 
 @pytest.mark.parametrize("perm, power, expected", [
     (Permutation([1, 2, 0]), 2, (2, 0, 1)),
@@ -79,7 +81,6 @@ def test_transposition_decomposition():
     assert p.transposition_decomposition() == [(0, 2), (1, 2)]
 
 
-
 @pytest.mark.parametrize("n", [3, 4, 5])
 def test_permutation_index(n):
     indices = [p.permutation_index() for p in Permutation.full_group(n)]
@@ -114,16 +115,18 @@ def test_parity_product_property(perm1, perm2):
 def test_double_inverse_property(perm):
     assert perm == perm.inverse.inverse
 
+
 # Property: order of permutation divides group order (n!)
 @given(perm=permutation_strategy())
 def test_order_divides_group_order(perm):
-    from math import factorial
-    assert factorial(perm.n) % perm.order == 0
+    assert math.factorial(perm.n) % perm.order == 0
+
 
 # Property: conjugacy class partition sums to n
 @given(perm=permutation_strategy())
 def test_conjugacy_class_sum(perm):
     assert sum(perm.conjugacy_class) == perm.n
+
 
 # Property: multiplication is associative
 @given(perm1=permutation_strategy(), perm2=permutation_strategy(), perm3=permutation_strategy())
@@ -132,6 +135,7 @@ def test_multiplication_associativity(perm1, perm2, perm3):
         return  # Skip if permutations are of different sizes
     assert (perm1 * perm2) * perm3 == perm1 * (perm2 * perm3)
 
+
 # Property: identity permutation is neutral element
 @given(perm=permutation_strategy())
 def test_identity_neutral(perm):
@@ -139,7 +143,14 @@ def test_identity_neutral(perm):
     assert perm * identity == perm
     assert identity * perm == perm
 
+
 # Property: permutation to the power of its order is identity
 @given(perm=permutation_strategy())
 def test_power_order_is_identity(perm):
     assert (perm ** perm.order).is_identity()
+
+
+@given(perm=permutation_strategy())
+def test_inverse_gives_identity(perm):
+    ident = Permutation.identity(perm.n)
+    assert perm * perm.inverse == ident

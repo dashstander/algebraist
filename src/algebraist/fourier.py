@@ -43,7 +43,24 @@ def get_all_irreps(n: int) -> list[SnIrrep]:
     return [SnIrrep(n, p) for p in generate_partitions(n)]
 
 
-def sn_minus_1_coset(tensor: torch.Tensor, sn_perms: torch.Tensor, idx: int) -> torch.Tensor:
+def lift_from_coset(lifted_fn, coset_fn: torch.Tensor, sn_perms: torch.Tensor, idx: int) -> torch.Tensor:
+    """
+    Inverse operation of restrict_to_coset. Assigns values from S_{n-1} cosets back to their correct positions in S_n.
+
+    Args:
+    tensor (torch.Tensor): The function on S_{n-1} cosets, shape (n, batch_size, (n-1)!)
+    sn_perms (torch.Tensor): A tensor-version of S_n with shape (n!, n)
+
+    Returns:
+    None, operates in place on lifted_fn
+    """
+    n = sn_perms.shape[1]
+    fixed_element = n - 1
+    coset_idx = torch.argwhere(sn_perms[:, idx] == fixed_element).squeeze()
+    lifted_fn[:, coset_idx] = coset_fn[idx]
+    
+
+def restrict_to_coset(tensor: torch.Tensor, sn_perms: torch.Tensor, idx: int) -> torch.Tensor:
     """
     Returns the values that a function on S_n takes on of one of the cosets of S_{n-1} < S_n
 
@@ -61,8 +78,6 @@ def sn_minus_1_coset(tensor: torch.Tensor, sn_perms: torch.Tensor, idx: int) -> 
     fixed_element = n - 1
     coset_idx = torch.argwhere(sn_perms[:, idx] == fixed_element).squeeze()
     return tensor[..., coset_idx]
- 
-
 
 def slow_sn_ft(fn_vals: torch.Tensor, n: int):
     """
@@ -88,7 +103,7 @@ def slow_sn_ft(fn_vals: torch.Tensor, n: int):
             result = torch.einsum('bi,i->b', fn_vals, matrices)
         else:  # Higher-dimensional representation
             result = torch.einsum('bi,ijk->bjk', fn_vals, matrices).squeeze()
-        results[irrep.shape] = result
+        results[irrep.partition] = result
     
     return results
 
@@ -130,6 +145,8 @@ def _inverse_fourier_projection(ft: torch.Tensor, irrep: SnIrrep):
     """
     
     matrices = irrep.matrix_tensor(ft.dtype, ft.device)
+    if ft.dim() < 2:
+        ft = ft.unsqueeze(0)
 
     if irrep.dim == 1:
         result = torch.einsum('...i,g->...ig', ft, matrices).squeeze()
@@ -140,6 +157,67 @@ def _inverse_fourier_projection(ft: torch.Tensor, irrep: SnIrrep):
         result = dim * torch.einsum('...ij,gij->...g', ft, matrices)
    
     return result
+
+
+def inverse_fourier_projection(ft, irrep):
+    n = irrep.n
+    if n <= BASE_CASE or irrep.dim == 1:
+        return _inverse_fourier_projection(ft, irrep) / math.factorial(n)
+    
+    sn_perms = generate_all_permutations(n)
+
+    # Ensure ft is always 3D (batch_dim, irrep.dim, irrep.dim)
+    has_batch = True
+    if ft.dim() == 2:
+        has_batch = False
+        ft = ft.unsqueeze(0)
+    
+    batch_dim = ft.shape[0]
+    
+    # Inverse this time
+    coset_rep_matrices = torch.stack([mat.T for mat in irrep.coset_rep_matrices(ft.dtype, ft.device)]).unsqueeze(0)
+    #assert coset_rep_matrices.shape == (1, n, irrep.dim, irrep.dim), \
+    #    f'{coset_rep_matrices.shape} != {(1, n, irrep.dim, irrep.dim)}'
+
+    # equivalent to [coset_rep_inverse @ ft for coset_rep_inverse in cosets]
+    # we have now translated the Fourier transform to be amenable to the S_{n-1} basis
+    coset_fts = torch.matmul(coset_rep_matrices, ft.unsqueeze(1))
+    #assert coset_fts.shape == (n, batch_dim, irrep.dim, irrep.dim), \
+    #    f'{coset_fts.shape} != {(n, batch_dim, irrep.dim, irrep.dim)}'
+
+    split_irreps = [SnIrrep(n-1, sub_partition) for sub_partition in irrep.split_partition()]
+
+
+    # We have a big (irrep.dim, irrep.dim) matrix as the result of the forward FFT
+    # With respect to the S_{n-1} irreps it has a block structure, here we pull those blocks out
+    # We scale by (irrep.dim / (sub_irrep.dim * n)) to keep things working nicely with the recursion.
+    # Non - recursively we scale by irrep.dim, we divide here to cancel that out. Basically at the very top level
+    # we only want the top or "main" irrep dim to contribute
+    sub_ft_blocks = [
+        (irrep.dim / (sub_irrep.dim * n)) * coset_fts[..., rows, cols] 
+        for (rows, cols), sub_irrep in zip(irrep.get_block_indices(), split_irreps)
+    ]
+
+    # recursive call here
+    sub_ifts = [
+        torch.vmap(inverse_fourier_projection, in_dims=(0, None))(block, sub_irrep)
+        for block, sub_irrep in zip(sub_ft_blocks, split_irreps)
+    ]
+    # there are n elements in sub_ifts, each is an ift on 
+    # assert all([ift.shape == (batch_dim, math.factorial(n-1)) for ift in sub_ifts])
+
+    fn_vals = torch.zeros((batch_dim, math.factorial(n)), dtype=ft.dtype, device=ft.device)
+    
+    # reshapes from 
+    for i, coset_ift in enumerate(sub_ifts):
+        # operates in place on fn_vals
+        lift_from_coset(fn_vals, coset_ift, sn_perms, i)
+    
+    if not has_batch:
+        fn_vals = fn_vals.squeeze()
+    
+    return fn_vals / math.factorial(n)
+    
 
 
 def fourier_projection(fn_vals: torch.Tensor, irrep: SnIrrep) -> torch.Tensor:
@@ -172,7 +250,7 @@ def fourier_projection(fn_vals: torch.Tensor, irrep: SnIrrep) -> torch.Tensor:
         has_batch = False
         fn_vals = fn_vals.unsqueeze(0)
 
-    coset_fns = torch.stack([sn_minus_1_coset(fn_vals, sn_perms, i) for i in range(n)]).permute(1, 0, 2)
+    coset_fns = torch.stack([restrict_to_coset(fn_vals, sn_perms, i) for i in range(n)]).permute(1, 0, 2)
     # Now coset_fns shape is (batch_dim, n, (n-1)!)
     # assert coset_fns.shape == (fn_vals.shape[0], n, math.factorial(n-1)), coset_fns.shape
     
@@ -196,7 +274,7 @@ def fourier_projection(fn_vals: torch.Tensor, irrep: SnIrrep) -> torch.Tensor:
 
     if not has_batch:
         result = result.squeeze(0) 
-      
+    
     return result
 
 
@@ -206,9 +284,19 @@ def sn_fft(fn_vals: torch.Tensor, n: int, verbose=False) -> dict[tuple[int, ...]
     if verbose:
         all_irreps = tqdm(all_irreps)
     for irrep in all_irreps:
-        result[irrep.shape] = fourier_projection(fn_vals, irrep)
+        result[irrep.partition] = fourier_projection(fn_vals, irrep)
     return result
 
+
+def sn_fourier_decomposition(ft, n):
+    return {
+        irrep.partition: inverse_fourier_projection(ft[irrep.partition], irrep)
+        for irrep in SnIrrep.generate_all_irreps(n)
+    }
+ 
+
+def sn_ifft(ft, n):
+    return sum(sn_fourier_decomposition(ft, n).values())
 
 
 def slow_sn_ift(ft, n: int):
@@ -224,10 +312,8 @@ def slow_sn_ift(ft, n: int):
     """
     permutations = Permutation.full_group(n)
     group_order = len(permutations)
-    irreps = {shape: SnIrrep(n, shape).matrix_tensor() for shape in ft.keys()}
-    trivial_irrep = (n,)
-    sign_irrep = tuple([1] * n)
-
+    irreps = {shape: SnIrrep(n, shape) for shape in ft.keys()}
+    
     batch_size = ft[(n - 1, 1)].shape[0] if len(ft[(n - 1, 1)].shape) == 3 else None
     if batch_size is None:
         ift = torch.zeros((group_order,), device=ft[(n - 1, 1)].device)
@@ -235,13 +321,8 @@ def slow_sn_ift(ft, n: int):
         ift = torch.zeros((batch_size, group_order), device=ft[(n - 1, 1)].device)
     for shape, irrep_ft in ft.items():
         # Properly the formula says we should multiply by $rho(g^{-1})$, i.e. the transpose here
-        inv_rep = irreps[shape].to(irrep_ft.dtype).to(irrep_ft.device)
-        if shape == trivial_irrep or shape == sign_irrep:
-            ift += torch.einsum('...i,g->...ig', irrep_ft, inv_rep).squeeze()
-        else: 
-            dim = inv_rep.shape[-1] 
-            # But this contracts the tensors in the correct order without the transpose
-            ift += dim * torch.einsum('...ij,gij->...g', irrep_ft, inv_rep)
+        #inv_rep = irreps[shape].to(irrep_ft.dtype).to(irrep_ft.device)
+        ift += _inverse_fourier_projection(irrep_ft, irreps[shape])
     
     return (ift / group_order)
 
@@ -259,10 +340,7 @@ def slow_sn_fourier_decomposition(ft, n: int):
     """
     permutations = Permutation.full_group(n)
     group_order = len(permutations)
-    irreps = {shape: SnIrrep(n, shape).matrix_tensor() for shape in ft.keys()}
-    trivial_irrep = (n,)
-    sign_irrep = tuple([1] * n)
-
+    irreps = {shape: SnIrrep(n, shape) for shape in ft.keys()}
     num_irreps = len(ft.keys())
     batch_size = ft[(n - 1, 1)].shape[0] if len(ft[(n - 1, 1)].shape) == 3 else None
 
@@ -272,12 +350,9 @@ def slow_sn_fourier_decomposition(ft, n: int):
         ift = torch.zeros((num_irreps, batch_size, group_order), device=ft[(n - 1, 1)].device)
 
     for i, (shape, irrep_ft) in enumerate(ft.items()):
-        inv_rep = irreps[shape].to(irrep_ft.dtype).to(irrep_ft.device)
-        if shape == trivial_irrep or shape == sign_irrep:  # One-dimensional representation
-            ift[i] = torch.einsum('...i,g->...ig', irrep_ft, inv_rep).squeeze()
-        else:  # Higher-dimensional representation
-            dim = inv_rep.shape[-1] 
-            ift[i] += dim * torch.einsum('...ij,gij->...g', irrep_ft, inv_rep)
+        #inv_rep = irreps[shape].to(irrep_ft.dtype).to(irrep_ft.device)
+        ift[i] = _inverse_fourier_projection(irrep_ft, irreps[shape])
+        
     if batch_size is not None:
         ift = ift.permute(1, 0, 2)
     return (ift / group_order).squeeze()

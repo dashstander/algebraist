@@ -13,7 +13,7 @@ Analyzing data on the symmetric group has applications in many fields including 
 ## Features
 
 - Efficient implementation of the $S_n$ FFT algorithm in PyTorch
-- Support for both (fast) forward and (slow right now) inverse transforms.
+- Support for both forward and inverse transforms.
 - Utilities for working with permutations and representations of $S_n$
 - Examples and tests demonstrating usage and correctness
 
@@ -34,7 +34,7 @@ Here's a basic example of how to use the $S_n$ FFT. For more in-depth examples o
 
 ```python
 import torch
-from algebraist import sn_fft
+from algebraist import sn_fft, sn_ifft
 
 # Create a function on S5 (represented as a tensor of size 120)
 n = 5
@@ -44,6 +44,13 @@ fn = torch.randn(120)
 ft = sn_fft(fn, n)
 
 # ft is now a dictionary mapping partitions to their Fourier transforms
+for partition, ft_matrix in ft.items():
+    # The frequencies of the Sn Fourier transform are the partitions of n
+    print(partition) # The partitions of 5 are (5,), (4, 1), (3, 1, 1), (2, 2, 1), (2, 1, 1, 1), and (1, 1, 1, 1, 1)
+    print(ft_matrix) # because S_n isn't abelian the output of the Fourier transform for each partition is a matrix
+
+# The Fourier transform is completely invertible
+assert fn == sn_ifft(ft, n)
 ```
 
 ## Requirements
