@@ -15,7 +15,6 @@ Analyzing data on the symmetric group has applications in many fields including 
 - Efficient implementation of the $S_n$ FFT algorithm in PyTorch
 - Support for both forward and inverse transforms.
 - Utilities for working with permutations and representations of $S_n$
-- Examples and tests demonstrating usage and correctness
 
 ## Installation
 
