@@ -105,7 +105,7 @@ def test_all_partitions(n):
             assert matrix.shape == (irrep.dim, irrep.dim)
 
 
-@given( sn_with_permutations())
+@given(sn_with_permutations())
 def test_representation_homomorphism(n_and_permutations):
     n, permutations = n_and_permutations
     partitions = generate_partitions(n)

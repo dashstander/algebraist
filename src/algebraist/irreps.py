@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-from copy import deepcopy
 from functools import cached_property, reduce
 from itertools import combinations, pairwise
 import numpy as np
@@ -26,7 +25,7 @@ from algebraist.tableau import enumerate_standard_tableau, generate_partitions, 
 from algebraist.utils import adj_trans_decomp, cycle_to_one_line, trans_to_one_line
 
 
-def contiguous_cycle(n: int, i: int):
+def contiguous_cycle(n: int, i: int) -> tuple[int, ...]:
     """ Generates a permutation (in cycle notation) of the form (i, i+1, ..., n)
     """
     if i == n - 1:

@@ -5,7 +5,7 @@ import pytest
 import torch
 import algebraist
 from algebraist.fourier import (
-    slow_sn_ft, slow_sn_ift, slow_sn_fourier_decomposition, sn_fft, sn_ifft, sn_fourier_decomposition, calc_power
+    slow_sn_ft, slow_sn_ift, sn_fft, sn_ifft, sn_fourier_decomposition, calc_power
 )
 from algebraist.permutations import Permutation
 from algebraist.irreps import SnIrrep
@@ -48,8 +48,9 @@ def generate_random_fourier_transform(n, batch_size=None):
     for irrep in SnIrrep.generate_all_irreps(n):
         ft[irrep.partition] = torch.randn(batch_size, irrep.dim, irrep.dim)
         if not has_batch:
-            ft[irrep.partition] =ft[irrep.partition].squeeze()
+            ft[irrep.partition] = ft[irrep.partition].squeeze()
     return ft
+
 
 @pytest.mark.parametrize("n", [3, 4, 5])
 @pytest.mark.parametrize("batch_size", [None, 1, 5])
@@ -66,15 +67,9 @@ def test_fourier_transform_invertibility(n, batch_size):
 def test_fourier_decomposition(n, batch_size):
     f = generate_random_function(n, batch_size)
     ft = sn_fft(f, n)
-    decomp = slow_sn_fourier_decomposition(ft, n)
-    if batch_size is not None and batch_size > 1:
-        assert decomp.shape == (batch_size, len(ft), math.factorial(n))
-    else:
-        assert decomp.shape == (len(ft), math.factorial(n))
-    reconstructed = decomp.sum(dim=-2)
-    if batch_size is None:
-        f = f.unsqueeze(0)
-    assert torch.allclose(f, reconstructed, atol=1e-5), f"Fourier decomposition failed for n={n}, batch_size={batch_size}"
+    decomp = sn_fourier_decomposition(ft, n)
+
+    assert torch.allclose(f, sum(decomp.values()), atol=1e-5), f"Fourier decomposition failed for n={n}, batch_size={batch_size}"
 
 
 @pytest.mark.parametrize("n", [3, 4, 5])
@@ -109,12 +104,10 @@ def test_convolution_theorem(n):
             ft_conv_freq[shape] = ft_f[shape] * ft_g[shape]
         else:
             ft_conv_freq[shape] = ft_f[shape] @ ft_g[shape]
-    #ft_conv = {shape: torch.matmul(ft_f[shape], ft_g[shape]) for shape in ft_f.keys()}
     for shape in ft_f.keys():
         assert torch.allclose(ft_conv_time[shape], ft_conv_freq[shape], atol=1.e-4),\
             f"Convolution theorem failed for n={n}, partition={shape}, max diff = {(ft_conv_time[shape] - ft_conv_freq[shape]).abs().max()}"
     
-
 
 @pytest.mark.parametrize("n", [3, 4, 5])
 def test_permutation_action(n):
@@ -142,8 +135,7 @@ def test_permutation_action(n):
     
     for shape in ft_action.keys():
         assert torch.allclose(ft_perm[shape], ft_action[shape], atol=1e-4), \
-            f"Permutation action failed for n={n}, shape={shape}"
-        
+            f"Permutation action failed for n={n}, shape={shape}"     
 
 
 @pytest.mark.parametrize("n", [3, 4, 5])
@@ -165,7 +157,6 @@ def test_sn_ifft(n):
     fast_ift = sn_ifft(ft, n)
 
     assert torch.allclose(slow_ift, fast_ift)
-
 
 
 if __name__ == '__main__':
