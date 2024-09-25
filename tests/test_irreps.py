@@ -25,7 +25,7 @@ def sn_with_permutations(draw):
 def test_snirrep_initialization():
     irrep = SnIrrep(3, (2, 1))
     assert irrep.n == 3
-    assert irrep.shape == (2, 1)
+    assert irrep.partition == (2, 1)
     assert len(irrep.basis) == 2  # There are two standard Young tableaux for (2,1)
 
 
@@ -78,12 +78,12 @@ def test_orthogonality_relations(n):
     # First orthogonality relation
     for irrep1 in irreps:
         for irrep2 in irreps:
-            if irrep1.shape != irrep2.shape:
+            if irrep1.partition != irrep2.partition:
                 continue
             reps1 = irrep1.matrix_representations
             reps2 = irrep2.matrix_representations
             sum_matrix = sum(reps1[perm.sigma] @ np.conj(reps2[perm.sigma].T) for perm in Permutation.full_group(n))
-            expected = np.eye(sum_matrix.shape[0]) if irrep1.shape == irrep2.shape else np.zeros_like(sum_matrix)
+            expected = np.eye(sum_matrix.shape[0]) if irrep1.partition == irrep2.partition else np.zeros_like(sum_matrix)
             assert np.allclose(sum_matrix / len(reps1), expected)
 
     # Second orthogonality relation (sum of squares of dimensions equals n!)
@@ -97,7 +97,7 @@ def test_all_partitions(n):
     for partition in partitions:
         irrep = SnIrrep(n, partition)
         assert irrep.n == n
-        assert irrep.shape == partition
+        assert irrep.partition == partition
         assert irrep.dim == len(irrep.basis)
         reps = irrep.matrix_representations
         assert len(reps) == math.factorial(n)

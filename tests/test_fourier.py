@@ -5,7 +5,7 @@ import pytest
 import torch
 import algebraist
 from algebraist.fourier import (
-    slow_sn_ft, slow_sn_ift, slow_sn_fourier_decomposition, sn_fft, calc_power
+    slow_sn_ft, slow_sn_ift, slow_sn_fourier_decomposition, sn_fft, sn_ifft, sn_fourier_decomposition, calc_power
 )
 from algebraist.permutations import Permutation
 from algebraist.irreps import SnIrrep
@@ -40,12 +40,23 @@ def generate_random_function(n, batch_size=None):
         return torch.randn(math.factorial(n))
     return torch.randn(batch_size, math.factorial(n))
 
+
+def generate_random_fourier_transform(n, batch_size=None):
+    has_batch = batch_size is not None
+    batch_size = batch_size if batch_size else 1
+    ft = {}
+    for irrep in SnIrrep.generate_all_irreps(n):
+        ft[irrep.partition] = torch.randn(batch_size, irrep.dim, irrep.dim)
+        if not has_batch:
+            ft[irrep.partition] =ft[irrep.partition].squeeze()
+    return ft
+
 @pytest.mark.parametrize("n", [3, 4, 5])
 @pytest.mark.parametrize("batch_size", [None, 1, 5])
 def test_fourier_transform_invertibility(n, batch_size):
     f = generate_random_function(n, batch_size)
     ft = sn_fft(f, n)
-    ift = slow_sn_ift(ft, n)
+    ift = sn_ifft(ft, n)
     f = f.squeeze()
     assert ift.shape == f.shape
     assert torch.allclose(f, ift, atol=1e-5), f"Fourier transform not invertible for n={n}, batch_size={batch_size}"
@@ -54,8 +65,7 @@ def test_fourier_transform_invertibility(n, batch_size):
 @pytest.mark.parametrize("batch_size", [None, 1, 5])
 def test_fourier_decomposition(n, batch_size):
     f = generate_random_function(n, batch_size)
-    ft = slow_sn_ft(f, n)
-    print(ft[(n -1, 1)].shape)
+    ft = sn_fft(f, n)
     decomp = slow_sn_fourier_decomposition(ft, n)
     if batch_size is not None and batch_size > 1:
         assert decomp.shape == (batch_size, len(ft), math.factorial(n))
@@ -146,6 +156,15 @@ def test_sn_fft(n):
     for irrep, tensor in fast_ft.items():
         equalities[irrep] = torch.allclose(slow_ft[irrep], tensor, atol=1.e-4)
     assert all(equalities.values()), equalities
+
+
+@pytest.mark.parametrize("n", [3, 4, 5])
+def test_sn_ifft(n):
+    ft = generate_random_fourier_transform(n)
+    slow_ift = slow_sn_ift(ft, n)
+    fast_ift = sn_ifft(ft, n)
+
+    assert torch.allclose(slow_ift, fast_ift)
 
 
 

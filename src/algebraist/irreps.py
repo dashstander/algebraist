@@ -22,7 +22,7 @@ import torch
 from typing import Iterator, Self
 
 from algebraist.permutations import Permutation
-from algebraist.tableau import enumerate_standard_tableau, generate_partitions, hook_length, YoungTableau
+from algebraist.tableau import enumerate_standard_tableau, generate_partitions, hook_length, youngs_lattice_covering_relation, YoungTableau
 from algebraist.utils import adj_trans_decomp, cycle_to_one_line, trans_to_one_line
 
 
@@ -40,8 +40,8 @@ class SnIrrep:
 
     def __init__(self, n: int, partition: tuple[int, ...]):
         self.n = n
-        self.shape = partition
-        self.dim = hook_length(self.shape)
+        self.partition = partition
+        self.dim = hook_length(self.partition)
         self.permutations = Permutation.full_group(n)
 
     @staticmethod
@@ -50,37 +50,38 @@ class SnIrrep:
             yield SnIrrep(n, partition)
 
     def __eq__(self, other) -> bool:
-        return self.shape == other.shape
+        return self.partition == other.shape
     
     def __hash__(self) -> int:
-        return hash(str(self.shape))
+        return hash(str(self.partition))
     
     def __repr__(self) -> str:
-        return f'S{self.n} Irrep: {self.shape}'
+        return f'S{self.n} Irrep: {self.partition}'
     
     @cached_property
     def basis(self) -> list[YoungTableau]:
-        return sorted(enumerate_standard_tableau(self.shape))
+        return sorted(enumerate_standard_tableau(self.partition))
 
     def split_partition(self) -> list[tuple[int, ...]]:
-        new_partitions = []
-        k = len(self.shape)
-        for i in range(k - 1):
-            # check if valid subrepresentation
-            if self.shape[i] > self.shape[i+1]:
-                # if so, copy, modify, and append to list
-                partition = list(deepcopy(self.shape))
-                partition[i] -= 1
-                new_partitions.append(tuple(partition))
-        # the last subrep
-        partition = list(deepcopy(self.shape))
-        if partition[-1] > 1:
-            partition[-1] -= 1
-        else:
-        # removing last element of partition if it’s a 1
-            del partition[-1]
-        new_partitions.append(tuple(partition))
-        return sorted(new_partitions)
+        """A list of the partitions directly underneath the partition that defines this irrep, in terms of Young's lattice.
+        These partitions directly beneath self.partition define the irreducible representations of S_{n-1} that this irrep "splits" into when we restrict to S_{n-1}. This relationship form the core of the "fast" part of the FFT.
+        """
+        return sorted(youngs_lattice_covering_relation(self.partition))
+    
+    def get_block_indices(self):
+        """When restricted to S_{n-1} this irrep has a block-diagonal form--one block for each of the split irreps of S_{n-1}. This helper method gets the indices of those blocks.
+        """
+        curr_row, curr_col = 0, 0
+        block_idx = []
+        for split_irrep in self.split_partition():
+            dim = SnIrrep(self.n - 1, split_irrep).dim
+            next_row = curr_row + dim
+            next_col = curr_col + dim
+            block_idx.append((slice(curr_row, next_row ), slice(curr_col, next_col)))
+            curr_row = next_row 
+            curr_col = next_col
+        
+        return block_idx
 
     def adjacent_transpositions(self) -> list[tuple[int, int]]:
         return pairwise(range(self.n))
@@ -116,6 +117,8 @@ class SnIrrep:
             decomp = [matrices[pair] for pair in adj_trans_decomp(i, j)]
             matrices[(i, j)] = reduce(lambda x, y: x @ y, decomp)
         return matrices
+    
+
 
     @cached_property
     def matrix_representations(self) -> dict[tuple[int], ArrayLike]:
@@ -145,9 +148,12 @@ class SnIrrep:
         ]
         return torch.concatenate(tensors, dim=0).squeeze().to(device)
 
-    def coset_rep_matrices(self, dtype=torch.float64) -> list[torch.Tensor]:
+    def coset_rep_matrices(self, dtype=torch.float64, device=torch.device('cpu')) -> list[torch.Tensor]:
         coset_reps = [Permutation(contiguous_cycle(self.n, i)).sigma for i in range(self.n)]
-        return  [torch.from_numpy(self.matrix_representations[rep]).to(dtype) for rep in coset_reps]
+        return  [
+            torch.from_numpy(self.matrix_representations[rep]).to(dtype).to(device)
+            for rep in coset_reps
+        ]
     
     def alternating_matrix_tensor(self, dtype=torch.float64, device=torch.device('cpu')):
         tensors = [
