@@ -16,16 +16,32 @@ filelock==3.16.1
     # via torch
 fsspec==2024.9.0
     # via torch
+jax==0.5.3
+    # via algebraist
+jaxlib==0.5.3
+    # via jax
 jinja2==3.1.4
     # via torch
 markupsafe==2.1.5
     # via jinja2
+ml-dtypes==0.5.1
+    # via jax
+    # via jaxlib
 mpmath==1.3.0
     # via sympy
 networkx==3.3
     # via torch
 numpy==2.1.1
     # via algebraist
+    # via jax
+    # via jaxlib
+    # via ml-dtypes
+    # via scipy
+opt-einsum==3.4.0
+    # via jax
+scipy==1.15.2
+    # via jax
+    # via jaxlib
 sympy==1.13.3
     # via torch
 torch==2.4.1

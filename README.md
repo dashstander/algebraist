@@ -1,6 +1,6 @@
 # Fast Fourier Transform for Sn
 
-A PyTorch implementation of the [Clausen & Baum (1993)](https://www.ams.org/journals/mcom/1993-61-204/S0025-5718-1993-1192969-X/S0025-5718-1993-1192969-X.pdf) Fast Fourier Transform (FFT) for the [symmetric group](https://en.wikipedia.org/wiki/Symmetric_group) $S_n$.
+A Jax implementation of the [Clausen & Baum (1993)](https://www.ams.org/journals/mcom/1993-61-204/S0025-5718-1993-1192969-X/S0025-5718-1993-1192969-X.pdf) Fast Fourier Transform (FFT) for the [symmetric group](https://en.wikipedia.org/wiki/Symmetric_group) $S_n$.
 
 ## Introduction
 
@@ -32,12 +32,13 @@ pip install -e .
 Here's a basic example of how to use the $S_n$ FFT. For more in-depth examples of how to use this code check the previous versions of it in the [sn-grok](https://github.com/dashstander/sn-grok) repo or read our paper ['Grokking Group Multiplication with Cosets'](https://arxiv.org/abs/2312.06581).
 
 ```python
-import torch
+import jax
 from algebraist import sn_fft, sn_ifft
 
 # Create a function on S5 (represented as a tensor of size 120)
 n = 5
-fn = torch.randn(120)
+key = jax.random.key(0)
+fn = jax.random.normal(key, (120,))
 
 # Compute the Fourier transform
 ft = sn_fft(fn, n)
@@ -54,7 +55,7 @@ assert fn == sn_ifft(ft, n)
 
 ## Requirements
 
-So far `algebraist` has been developed with Python 3.11 and PyTorch 2.4 and I cannot promise that it will work with any other versions. Though the only new-ish feature that the library uses often is `torch.vmap`, so any PyTorch version that has merged in `functorch` _should_ work.
+So far `algebraist` has been developed with Python 3.11 and I cannot promise that it will work with any other versions.
 
 
 ## License
