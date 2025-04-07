@@ -137,7 +137,10 @@ class Permutation:
     @property
     def parity(self):
         even_cycles = [c for c in self.cycle_rep if (len(c) % 2 == 0)]
-        return len(even_cycles) % 2
+        if len(even_cycles) % 2 == 0:
+            return 1
+        else:
+            return -1
     
     @property
     def conjugacy_class(self):

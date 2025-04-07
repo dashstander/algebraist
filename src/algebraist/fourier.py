@@ -24,7 +24,7 @@ from algebraist.tableau import generate_partitions
 from algebraist.utils import generate_all_permutations
 
 
-BASE_CASE = 5
+BASE_CASE = 6
 
 
 @lru_cache(maxsize=20)
