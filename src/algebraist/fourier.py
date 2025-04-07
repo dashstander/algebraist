@@ -14,8 +14,11 @@
 
 
 from functools import lru_cache
+import jax
+import jax.numpy as jnp
+
 import math
-import torch
+#import torch
 from tqdm import tqdm
 
 from algebraist.irreps import SnIrrep
@@ -43,24 +46,24 @@ def get_all_irreps(n: int) -> list[SnIrrep]:
     return [SnIrrep(n, p) for p in generate_partitions(n)]
 
 
-def lift_from_coset(lifted_fn, coset_fn: torch.Tensor, sn_perms: torch.Tensor, idx: int) -> torch.Tensor:
+def lift_from_coset(lifted_fn, coset_fn: jax.Array, sn_perms: jax.Array, idx: int) -> jax.Array:
     """
     Inverse operation of restrict_to_coset. Assigns values from S_{n-1} cosets back to their correct positions in S_n.
 
     Args:
-    tensor (torch.Tensor): The function on S_{n-1} cosets, shape (n, batch_size, (n-1)!)
-    sn_perms (torch.Tensor): A tensor-version of S_n with shape (n!, n)
+    tensor (jax.Array): The function on S_{n-1} cosets, shape (n, batch_size, (n-1)!)
+    sn_perms (jax.Array): A tensor-version of S_n with shape (n!, n)
 
     Returns:
     None, operates in place on lifted_fn
     """
     n = sn_perms.shape[1]
     fixed_element = n - 1
-    coset_idx = torch.argwhere(sn_perms[:, idx] == fixed_element).squeeze()
+    coset_idx = jnp.argwhere(sn_perms[:, idx] == fixed_element).squeeze()
     lifted_fn[:, coset_idx] = coset_fn[idx]
     
 
-def restrict_to_coset(tensor: torch.Tensor, sn_perms: torch.Tensor, idx: int) -> torch.Tensor:
+def restrict_to_coset(tensor: jax.Array, sn_perms: jax.Array, idx: int) -> jax.Array:
     """
     Returns the values that a function on S_n takes on of one of the cosets of S_{n-1} < S_n
 
@@ -76,10 +79,10 @@ def restrict_to_coset(tensor: torch.Tensor, sn_perms: torch.Tensor, idx: int) ->
     """
     n = sn_perms.shape[1]
     fixed_element = n - 1
-    coset_idx = torch.argwhere(sn_perms[:, idx] == fixed_element).squeeze()
+    coset_idx = jnp.argwhere(sn_perms[:, idx] == fixed_element).squeeze()
     return tensor[..., coset_idx]
 
-def slow_sn_ft(fn_vals: torch.Tensor, n: int):
+def slow_sn_ft(fn_vals: jax.Array, n: int):
     """
     Compute the Fourier transform on Sn.
     
@@ -93,22 +96,22 @@ def slow_sn_ft(fn_vals: torch.Tensor, n: int):
     all_irreps = [SnIrrep(n, p) for p in generate_partitions(n)]
     results = {}
     
-    if fn_vals.dim() == 1:
-        fn_vals = fn_vals.unsqueeze(0)  # Add batch dimension if not present
+    if jnp.ndim(fn_vals) == 1:
+        fn_vals = jnp.expand_dims(fn_vals, 0)  # Add batch dimension if not present
 
     for irrep in all_irreps:
-        matrices = irrep.matrix_tensor(fn_vals.dtype, fn_vals.device)
+        matrices = irrep.matrix_tensor()
 
-        if matrices.dim() == 1:  # One-dimensional representation
-            result = torch.einsum('bi,i->b', fn_vals, matrices)
+        if jnp.ndim(matrices) == 1:  # One-dimensional representation
+            result = jnp.einsum('bi,i->b', fn_vals, matrices)
         else:  # Higher-dimensional representation
-            result = torch.einsum('bi,ijk->bjk', fn_vals, matrices).squeeze()
+            result = jnp.einsum('bi,ijk->bjk', fn_vals, matrices).squeeze()
         results[irrep.partition] = result
     
     return results
 
 
-def _fourier_projection(fn_vals: torch.Tensor, irrep: SnIrrep):
+def _fourier_projection(fn_vals: jax.Array, irrep: SnIrrep):
     """
     A non-recursive projection onto one of the irreducible representations (irreps) of Sn, for the "base case" of n= 4 or 5 where the 
     number of group elements is small enough that it is easier to rely on the inherent parallelism of PyTorch.
@@ -121,17 +124,17 @@ def _fourier_projection(fn_vals: torch.Tensor, irrep: SnIrrep):
     torch.Tensor: the projection of `fn_vals` onto the irreducible representation given by `irrep`
     """
     
-    matrices = irrep.matrix_tensor(fn_vals.dtype, fn_vals.device)
+    matrices = irrep.matrix_tensor()
 
-    if matrices.dim() == 1:  # One-dimensional representation
-        result = torch.einsum('...i,i->...', fn_vals, matrices)
+    if jnp.ndim(matrices) == 1:  # One-dimensional representation
+        result = jnp.einsum('...i,i->...', fn_vals, matrices)
     else:  # Higher-dimensional representation
-        result = torch.einsum('...i,ijk->...jk', fn_vals, matrices).squeeze()
+        result = jnp.einsum('...i,ijk->...jk', fn_vals, matrices).squeeze()
    
     return result
 
 
-def _inverse_fourier_projection(ft: torch.Tensor, irrep: SnIrrep):
+def _inverse_fourier_projection(ft: jax.Array, irrep: SnIrrep):
     """
     A non-recursive projection onto one of the irreducible representations (irreps) of Sn, for the "base case" of n= 4 or 5 where the 
     number of group elements is small enough that it is easier to rely on the inherent parallelism of PyTorch.
@@ -141,20 +144,20 @@ def _inverse_fourier_projection(ft: torch.Tensor, irrep: SnIrrep):
     irrep (SnIrrep): an irreducible representation of Sn
     
     Returns:
-    torch.Tensor: the projection of `fn_vals` onto the irreducible representation given by `irrep`
+    jax.Array: the projection of `fn_vals` onto the irreducible representation given by `irrep`
     """
     
-    matrices = irrep.matrix_tensor(ft.dtype, ft.device)
-    if ft.dim() < 2:
-        ft = ft.unsqueeze(0)
+    matrices = irrep.matrix_tensor()
+    if jnp.ndim(ft) < 2:
+        ft = jnp.expand_dims(ft, 0)
 
     if irrep.dim == 1:
-        result = torch.einsum('...i,g->...ig', ft, matrices).squeeze()
+        result = jnp.einsum('...i,g->...ig', ft, matrices).squeeze()
     else: 
         dim = irrep.dim
         # In the normal formula we multiply by the inverse (transpose) of the irreps,
         # but this contracts the tensors in the correct order without the transpose
-        result = dim * torch.einsum('...ij,gij->...g', ft, matrices)
+        result = dim * jnp.einsum('...ij,gij->...g', ft, matrices)
    
     return result
 
@@ -168,20 +171,25 @@ def inverse_fourier_projection(ft, irrep):
 
     # Ensure ft is always 3D (batch_dim, irrep.dim, irrep.dim)
     has_batch = True
-    if ft.dim() == 2:
+    if jnp.ndim(ft) == 2:
         has_batch = False
-        ft = ft.unsqueeze(0)
+        ft = jnp.expand_dims(ft, 0)
     
     batch_dim = ft.shape[0]
     
     # Inverse this time
-    coset_rep_matrices = torch.stack([mat.T for mat in irrep.coset_rep_matrices(ft.dtype, ft.device)]).unsqueeze(0)
+    coset_rep_matrices = jnp.expand_dims(
+        jnp.stack([
+            mat.T for mat in irrep.coset_rep_matrices()
+        ]),
+        0
+    )
     #assert coset_rep_matrices.shape == (1, n, irrep.dim, irrep.dim), \
     #    f'{coset_rep_matrices.shape} != {(1, n, irrep.dim, irrep.dim)}'
 
     # equivalent to [coset_rep_inverse @ ft for coset_rep_inverse in cosets]
     # we have now translated the Fourier transform to be amenable to the S_{n-1} basis
-    coset_fts = torch.matmul(coset_rep_matrices, ft.unsqueeze(1))
+    coset_fts = jnp.matmul(coset_rep_matrices, jnp.expand_dims(ft, 1))
     #assert coset_fts.shape == (n, batch_dim, irrep.dim, irrep.dim), \
     #    f'{coset_fts.shape} != {(n, batch_dim, irrep.dim, irrep.dim)}'
 
@@ -200,13 +208,13 @@ def inverse_fourier_projection(ft, irrep):
 
     # recursive call here
     sub_ifts = [
-        torch.vmap(inverse_fourier_projection, in_dims=(0, None))(block, sub_irrep)
+        jax.vmap(inverse_fourier_projection, in_axes=(0, None))(block, sub_irrep)
         for block, sub_irrep in zip(sub_ft_blocks, split_irreps)
     ]
     # there are n elements in sub_ifts, each is an ift on 
     # assert all([ift.shape == (batch_dim, math.factorial(n-1)) for ift in sub_ifts])
 
-    fn_vals = torch.zeros((batch_dim, math.factorial(n)), dtype=ft.dtype, device=ft.device)
+    fn_vals = jax.zeros((batch_dim, math.factorial(n)), dtype=ft.dtype, device=ft.device)
     
     # reshapes from 
     for i, coset_ift in enumerate(sub_ifts):
@@ -220,7 +228,7 @@ def inverse_fourier_projection(ft, irrep):
     
 
 
-def fourier_projection(fn_vals: torch.Tensor, irrep: SnIrrep) -> torch.Tensor:
+def fourier_projection(fn_vals: jax.Array, irrep: SnIrrep) -> jax.Array:
     """
     Fast projection of a function on S_n (given as a pytorch tensor) onto one of the irreducible representations (irreps) of S_n. If n > 5 then
     this is done recursively, splitting the irreps into irreps of S_{n-1}.
@@ -246,31 +254,34 @@ def fourier_projection(fn_vals: torch.Tensor, irrep: SnIrrep) -> torch.Tensor:
     sn_perms = generate_all_permutations(n)
     # Ensure fn_vals is always 2D (batch_dim, n!)
     has_batch = True
-    if fn_vals.dim() == 1:
+    if jnp.ndim(fn_vals) == 1:
         has_batch = False
-        fn_vals = fn_vals.unsqueeze(0)
+        fn_vals = jnp.expand_dims(fn_vals, 0)
 
-    coset_fns = torch.stack([restrict_to_coset(fn_vals, sn_perms, i) for i in range(n)]).permute(1, 0, 2)
+    coset_fns = jnp.stack([restrict_to_coset(fn_vals, sn_perms, i) for i in range(n)]).permute(1, 0, 2)
     # Now coset_fns shape is (batch_dim, n, (n-1)!)
     # assert coset_fns.shape == (fn_vals.shape[0], n, math.factorial(n-1)), coset_fns.shape
     
-    coset_rep_matrices = torch.stack(irrep.coset_rep_matrices(fn_vals.dtype, fn_vals.device)).unsqueeze(0)
+    coset_rep_matrices = jnp.expand_dims(
+        jax.stack(irrep.coset_rep_matrices(fn_vals.dtype, fn_vals.device)),
+        0
+    )
     # assert coset_rep_matrices.shape == (1, n, irrep.dim, irrep.dim), coset_rep_matrices.shape
     split_irreps = [SnIrrep(n-1, split_shape) for split_shape in irrep.split_partition()]
     
     # Recursive call, use vmap to apply across the batch dimension
     sub_fts = [
-        torch.vmap(fourier_projection, in_dims=(0, None))(coset_fns, split_irrep) 
+        jax.vmap(fourier_projection, in_axes=(0, None))(coset_fns, split_irrep) 
         for split_irrep in split_irreps
     ]
     
     # Use vmap to apply block_diag across the combined n * batch_dim
-    block_diag_vmap = torch.vmap(torch.vmap(torch.block_diag))
+    block_diag_vmap = jax.vmap(jax.vmap(jax.block_diag))
     combined_sub_fts = block_diag_vmap(*sub_fts)
     # combined_sub_fts shape: (n * batch_dim, irrep_dim, irrep_dim)
     # assert combined_sub_fts.shape == (fn_vals.shape[0], n, irrep.dim, irrep.dim)
     
-    result = torch.matmul(coset_rep_matrices, combined_sub_fts).sum(1)
+    result = jax.matmul(coset_rep_matrices, combined_sub_fts).sum(1)
 
     if not has_batch:
         result = result.squeeze(0) 
@@ -278,7 +289,7 @@ def fourier_projection(fn_vals: torch.Tensor, irrep: SnIrrep) -> torch.Tensor:
     return result
 
 
-def sn_fft(fn_vals: torch.Tensor, n: int, verbose=False) -> dict[tuple[int, ...], torch.Tensor]:    
+def sn_fft(fn_vals: jax.Array, n: int, verbose=False) -> dict[tuple[int, ...], jax.Array]:    
     result = {}
     all_irreps = list(SnIrrep.generate_all_irreps(n))
     if verbose:
@@ -316,9 +327,9 @@ def slow_sn_ift(ft, n: int):
     
     batch_size = ft[(n - 1, 1)].shape[0] if len(ft[(n - 1, 1)].shape) == 3 else None
     if batch_size is None:
-        ift = torch.zeros((group_order,), device=ft[(n - 1, 1)].device)
+        ift = jnp.zeros((group_order,), device=ft[(n - 1, 1)].device)
     else:
-        ift = torch.zeros((batch_size, group_order), device=ft[(n - 1, 1)].device)
+        ift = jnp.zeros((batch_size, group_order), device=ft[(n - 1, 1)].device)
     for shape, irrep_ft in ft.items():
         # Properly the formula says we should multiply by $rho(g^{-1})$, i.e. the transpose here
         #inv_rep = irreps[shape].to(irrep_ft.dtype).to(irrep_ft.device)
@@ -345,9 +356,9 @@ def slow_sn_fourier_decomposition(ft, n: int):
     batch_size = ft[(n - 1, 1)].shape[0] if len(ft[(n - 1, 1)].shape) == 3 else None
 
     if batch_size is None:
-        ift = torch.zeros((num_irreps, group_order,), device=ft[(n - 1, 1)].device)
+        ift = jnp.zeros((num_irreps, group_order,), device=ft[(n - 1, 1)].device)
     else:
-        ift = torch.zeros((num_irreps, batch_size, group_order), device=ft[(n - 1, 1)].device)
+        ift = jnp.zeros((num_irreps, batch_size, group_order), device=ft[(n - 1, 1)].device)
 
     for i, (shape, irrep_ft) in enumerate(ft.items()):
         #inv_rep = irreps[shape].to(irrep_ft.dtype).to(irrep_ft.device)
@@ -366,10 +377,10 @@ def _calc_power(ft, n: int):
     sign_irrep = tuple([1] * n)
     for tableau, tensor in ft.items():
         if tableau == trivial_irrep or tableau == sign_irrep:  # 1D representation
-            power[tableau] = (tensor ** 2).sum(dim=0) / group_order
+            power[tableau] = (tensor ** 2) / group_order
         else:
             dim = tensor.shape[-1]
-            power[tableau] = dim * torch.trace(tensor @ tensor.T) / group_order    
+            power[tableau] = dim * jnp.trace(tensor @ tensor.T) / group_order    
     return power
 
 
@@ -388,7 +399,7 @@ def calc_power(ft, n: int):
     has_batch_dim = len(ft[(n - 1, 1)].shape) == 3
 
     if has_batch_dim:
-        return torch.vmap(_calc_power, in_dims=(0, None))(ft, n)
+        return jax.vmap(_calc_power, in_axes=(0, None))(ft, n)
     else:
         return _calc_power(ft, n)
 

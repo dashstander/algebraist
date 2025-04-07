@@ -15,9 +15,10 @@
 
 from functools import cached_property, reduce
 from itertools import combinations, pairwise
+import jax
+import jax.numpy as jnp
 import numpy as np
 from numpy.typing import ArrayLike
-import torch
 from typing import Iterator, Self
 
 from algebraist.permutations import Permutation
@@ -140,23 +141,23 @@ class SnIrrep:
         self._matrices = matrices
         return matrices
 
-    def matrix_tensor(self, dtype=torch.float64, device=torch.device('cpu')) -> torch.Tensor:
+    def matrix_tensor(self) -> jax.Array:
         tensors = [
-            torch.from_numpy(self.matrix_representations[perm.sigma]).unsqueeze(0).to(dtype)
+            jnp.expand_dims(jnp.array(self.matrix_representations[perm.sigma]), 0)
             for perm in self.permutations
         ]
-        return torch.concatenate(tensors, dim=0).squeeze().to(device)
+        return jnp.concatenate(tensors, axis=0).squeeze()
 
-    def coset_rep_matrices(self, dtype=torch.float64, device=torch.device('cpu')) -> list[torch.Tensor]:
+    def coset_rep_matrices(self) -> list[jax.Array]:
         coset_reps = [Permutation(contiguous_cycle(self.n, i)).sigma for i in range(self.n)]
         return  [
-            torch.from_numpy(self.matrix_representations[rep]).to(dtype).to(device)
+            jnp.array(self.matrix_representations[rep])
             for rep in coset_reps
         ]
     
-    def alternating_matrix_tensor(self, dtype=torch.float64, device=torch.device('cpu')):
+    def alternating_matrix_tensor(self):
         tensors = [
-            torch.asarray(self.matrix_representations[perm.sigma]).unsqueeze(0).to(dtype)
+            jnp.expand_dims(jnp.array(self.matrix_representations[perm.sigma]), 0)
             for perm in self.permutations if perm.parity == 0
         ]
-        return torch.concatenate(tensors, dim=0).squeeze().to(device)
+        return jnp.concatenate(tensors, axis=0).squeeze()
