@@ -50,7 +50,7 @@ class SnIrrep:
             yield SnIrrep(n, partition)
 
     def __eq__(self, other) -> bool:
-        return self.partition == other.shape
+        return self.partition == other.partition
     
     def __hash__(self) -> int:
         return hash(str(self.partition))

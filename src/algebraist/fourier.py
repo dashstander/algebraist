@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from functools import lru_cache
+from functools import partial
 import jax
 import jax.numpy as jnp
 
@@ -30,7 +30,6 @@ from algebraist.utils import generate_all_permutations
 BASE_CASE = 5
 
 
-@lru_cache(maxsize=20)
 def get_all_irreps(n: int) -> list[SnIrrep]:
     """
     Collects a list of all of the irreducible representations (irreps) of S_n.
@@ -46,6 +45,7 @@ def get_all_irreps(n: int) -> list[SnIrrep]:
     return [SnIrrep(n, p) for p in generate_partitions(n)]
 
 
+@jax.jit
 def lift_from_coset(lifted_fn, coset_fn: jax.Array, sn_perms: jax.Array, idx: int) -> jax.Array:
     """
     Inverse operation of restrict_to_coset. Assigns values from S_{n-1} cosets back to their correct positions in S_n.
@@ -63,6 +63,7 @@ def lift_from_coset(lifted_fn, coset_fn: jax.Array, sn_perms: jax.Array, idx: in
     lifted_fn[:, coset_idx] = coset_fn[idx]
     
 
+@jax.jit
 def restrict_to_coset(tensor: jax.Array, sn_perms: jax.Array, idx: int) -> jax.Array:
     """
     Returns the values that a function on S_n takes on of one of the cosets of S_{n-1} < S_n
@@ -82,35 +83,8 @@ def restrict_to_coset(tensor: jax.Array, sn_perms: jax.Array, idx: int) -> jax.A
     coset_idx = jnp.argwhere(sn_perms[:, idx] == fixed_element).squeeze()
     return tensor[..., coset_idx]
 
-def slow_sn_ft(fn_vals: jax.Array, n: int):
-    """
-    Compute the Fourier transform on Sn.
-    
-    Args:
-    fn_vals (torch.Tensor): Input tensor of shape (batch_size, n!) or (n!,)
-    n (int): The order of the symmetric group
-    
-    Returns:
-    dict: A dictionary mapping partitions to their Fourier transforms
-    """
-    all_irreps = [SnIrrep(n, p) for p in generate_partitions(n)]
-    results = {}
-    
-    if jnp.ndim(fn_vals) == 1:
-        fn_vals = jnp.expand_dims(fn_vals, 0)  # Add batch dimension if not present
 
-    for irrep in all_irreps:
-        matrices = irrep.matrix_tensor()
-
-        if jnp.ndim(matrices) == 1:  # One-dimensional representation
-            result = jnp.einsum('bi,i->b', fn_vals, matrices)
-        else:  # Higher-dimensional representation
-            result = jnp.einsum('bi,ijk->bjk', fn_vals, matrices).squeeze()
-        results[irrep.partition] = result
-    
-    return results
-
-
+@partial(jax.jit, static_argnums=1)
 def _fourier_projection(fn_vals: jax.Array, irrep: SnIrrep):
     """
     A non-recursive projection onto one of the irreducible representations (irreps) of Sn, for the "base case" of n= 4 or 5 where the 
@@ -134,6 +108,7 @@ def _fourier_projection(fn_vals: jax.Array, irrep: SnIrrep):
     return result
 
 
+@partial(jax.jit, static_argnums=1)
 def _inverse_fourier_projection(ft: jax.Array, irrep: SnIrrep):
     """
     A non-recursive projection onto one of the irreducible representations (irreps) of Sn, for the "base case" of n= 4 or 5 where the 
@@ -162,6 +137,7 @@ def _inverse_fourier_projection(ft: jax.Array, irrep: SnIrrep):
     return result
 
 
+@partial(jax.jit, static_argnums=1)
 def inverse_fourier_projection(ft, irrep):
     n = irrep.n
     if n <= BASE_CASE or irrep.dim == 1:
@@ -227,7 +203,7 @@ def inverse_fourier_projection(ft, irrep):
     return fn_vals / math.factorial(n)
     
 
-
+@partial(jax.jit, static_argnums=1)
 def fourier_projection(fn_vals: jax.Array, irrep: SnIrrep) -> jax.Array:
     """
     Fast projection of a function on S_n (given as a pytorch tensor) onto one of the irreducible representations (irreps) of S_n. If n > 5 then
@@ -289,11 +265,9 @@ def fourier_projection(fn_vals: jax.Array, irrep: SnIrrep) -> jax.Array:
     return result
 
 
-def sn_fft(fn_vals: jax.Array, n: int, verbose=False) -> dict[tuple[int, ...], jax.Array]:    
+def sn_fft(fn_vals: jax.Array, n: int) -> dict[tuple[int, ...], jax.Array]:    
     result = {}
     all_irreps = list(SnIrrep.generate_all_irreps(n))
-    if verbose:
-        all_irreps = tqdm(all_irreps)
     for irrep in all_irreps:
         result[irrep.partition] = fourier_projection(fn_vals, irrep)
     return result
@@ -308,6 +282,35 @@ def sn_fourier_decomposition(ft, n):
 
 def sn_ifft(ft, n):
     return sum(sn_fourier_decomposition(ft, n).values())
+
+
+def slow_sn_ft(fn_vals: jax.Array, n: int):
+    """
+    Compute the Fourier transform on Sn.
+    
+    Args:
+    fn_vals (torch.Tensor): Input tensor of shape (batch_size, n!) or (n!,)
+    n (int): The order of the symmetric group
+    
+    Returns:
+    dict: A dictionary mapping partitions to their Fourier transforms
+    """
+    all_irreps = [SnIrrep(n, p) for p in generate_partitions(n)]
+    results = {}
+    
+    if jnp.ndim(fn_vals) == 1:
+        fn_vals = jnp.expand_dims(fn_vals, 0)  # Add batch dimension if not present
+
+    for irrep in all_irreps:
+        matrices = irrep.matrix_tensor()
+
+        if jnp.ndim(matrices) == 1:  # One-dimensional representation
+            result = jnp.einsum('bi,i->b', fn_vals, matrices)
+        else:  # Higher-dimensional representation
+            result = jnp.einsum('bi,ijk->bjk', fn_vals, matrices).squeeze()
+        results[irrep.partition] = result
+    
+    return results
 
 
 def slow_sn_ift(ft, n: int):
