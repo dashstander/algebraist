@@ -16,10 +16,7 @@
 from functools import partial
 import jax
 import jax.numpy as jnp
-
 import math
-#import torch
-from tqdm import tqdm
 
 from algebraist.irreps import SnIrrep
 from algebraist.permutations import Permutation
