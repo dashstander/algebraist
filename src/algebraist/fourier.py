@@ -68,12 +68,12 @@ def restrict_to_coset(tensor: jax.Array, sn_perms: jax.Array, idx: int) -> jax.A
     There are n cosets of S_{n-1} < S_n. Young's Orthogonal Form (YOR) is specifically adapted to the copy of S_{n-1} where the element n is fixed in the nth position. The _cosets_ of this subgroup correspond to the elements that all have n in a given position.
 
     Args:
-    tensor (torch.Tensor): The function on S_n we are working with, either shape (batch, n!) or (n!,)
-    sn_perms (torch.Tensor): A tensor-version of S_n with shape (n!, n), each row is the elements 0..n-1 permuted, and the rows are in lexicographic order
+    tensor (jax.Array): The function on S_n we are working with, either shape (batch, n!) or (n!,)
+    sn_perms (jax.Array): A tensor-version of S_n with shape (n!, n), each row is the elements 0..n-1 permuted, and the rows are in lexicographic order
     idx (int): The index of n that defines the coset we are grabbing
 
     Returns:
-    torch.Tensor either of shape (batch, (n-1)!) or ((n-1)!, ), depending on whether or not tensor had a batch dimension
+    jax.Array either of shape (batch, (n-1)!) or ((n-1)!, ), depending on whether or not tensor had a batch dimension
     """
     n = sn_perms.shape[1]
     fixed_element = n - 1
@@ -88,11 +88,11 @@ def _fourier_projection(fn_vals: jax.Array, irrep: SnIrrep):
     number of group elements is small enough that it is easier to rely on the inherent parallelism of PyTorch.
     
     Args:
-    fn_vals (torch.Tensor): Input tensor of shape (batch_size, n!) or (n!,)
+    fn_vals (jax.Array): Input tensor of shape (batch_size, n!) or (n!,)
     irrep (SnIrrep): an irreducible representation of Sn
     
     Returns:
-    torch.Tensor: the projection of `fn_vals` onto the irreducible representation given by `irrep`
+    jax.Array: the projection of `fn_vals` onto the irreducible representation given by `irrep`
     """
     
     matrices = irrep.matrix_tensor()
@@ -112,7 +112,7 @@ def _inverse_fourier_projection(ft: jax.Array, irrep: SnIrrep):
     number of group elements is small enough that it is easier to rely on the inherent parallelism of PyTorch.
     
     Args:
-    ft (torch.Tensor): Input tensor of shape (batch_size, irrep_dim, irrep_dim) or (irrep_dim, irrep_dim)
+    ft (jax.Array): Input tensor of shape (batch_size, irrep_dim, irrep_dim) or (irrep_dim, irrep_dim)
     irrep (SnIrrep): an irreducible representation of Sn
     
     Returns:
@@ -215,11 +215,11 @@ def fourier_projection(fn_vals: jax.Array, irrep: SnIrrep) -> jax.Array:
     To get around this we: (1) Use vmap across the given batch dimension of fn_vals (2) Always return the tensor to have the same batch dimension (or none) as fn_vals
     
     Args:
-    fn_vals (torch.Tensor): A tensor of shape (batch_size, n!) for an integer n
+    fn_vals (jax.Array): A tensor of shape (batch_size, n!) for an integer n
     irrep (SnIrrep): An irreducible representation of Sn, given by an integer partition of n
 
     Returns:
-    torch.Tensor the projection of `fn_vals` onto `irrep` with shape (batch_size, irrep.dim, irrep.dim)
+    jax.Array the projection of `fn_vals` onto `irrep` with shape (batch_size, irrep.dim, irrep.dim)
     """
     n = irrep.n
     if n <= BASE_CASE or irrep.dim == 1:
@@ -286,7 +286,7 @@ def slow_sn_ft(fn_vals: jax.Array, n: int):
     Compute the Fourier transform on Sn.
     
     Args:
-    fn_vals (torch.Tensor): Input tensor of shape (batch_size, n!) or (n!,)
+    fn_vals (jax.Array): Input tensor of shape (batch_size, n!) or (n!,)
     n (int): The order of the symmetric group
     
     Returns:
@@ -319,7 +319,7 @@ def slow_sn_ift(ft, n: int):
     n (int): The order of the symmetric group
     
     Returns:
-    torch.Tensor: The inverse Fourier transform of shape (batch_size, n!)
+    jax.Array: The inverse Fourier transform of shape (batch_size, n!)
     """
     permutations = Permutation.full_group(n)
     group_order = len(permutations)
@@ -347,7 +347,7 @@ def slow_sn_fourier_decomposition(ft, n: int):
     n (int): The order of the symmetric group
     
     Returns:
-    torch.Tensor: The inverse Fourier transform of shape (batch_size, n!)
+    jax.Array: The inverse Fourier transform of shape (batch_size, n!)
     """
     permutations = Permutation.full_group(n)
     group_order = len(permutations)
