@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from copy import deepcopy
-from functools import lru_cache
+from functools import partial
 from itertools import pairwise, permutations
 import jax
 import jax.numpy as jnp
@@ -59,7 +59,7 @@ def cycle_to_one_line(cycle_rep: list[tuple[int, ...]]) -> tuple[int, ...]:
     return tuple(sigma)
 
 
-@jax.jit
+@partial(jax.jit, static_argnums=0)
 def generate_all_permutations(n: int) -> jax.Array:
     return jnp.array(list(permutations(range(n))))
 
