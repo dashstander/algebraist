@@ -54,6 +54,10 @@ def get_cached_coset_indices(n, idx):
     return COSET_INDICES_CACHE[key]
 
 
+for n in range(5, 8):
+    for idx in range(n):
+        get_cached_coset_indices(n, idx)
+
 
 def get_all_irreps(n: int) -> list[SnIrrep]:
     """
