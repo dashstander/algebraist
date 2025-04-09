@@ -25,6 +25,34 @@ from algebraist.utils import generate_all_permutations
 
 
 BASE_CASE = 5
+COSET_INDICES_CACHE = {}
+
+
+def get_coset_indices(n, idx):
+    """
+    Precompute indices for a specific coset.
+    
+    Args:
+    n: Size of the permutation group
+    idx: Position index for the fixed element
+    
+    Returns:
+    Array of indices where element (n-1) is at position idx
+    """
+    # This function is only called outside of JIT contexts
+    sn_perms = generate_all_permutations(n)
+    fixed_element = n - 1
+    mask = (sn_perms[:, idx] == fixed_element)
+    return jnp.where(mask)[0]  # Get the actual indices where mask is True
+
+
+def get_cached_coset_indices(n, idx):
+    """Get cached coset indices or compute them if not cached."""
+    key = (n, idx)
+    if key not in COSET_INDICES_CACHE:
+        COSET_INDICES_CACHE[key] = get_coset_indices(n, idx)
+    return COSET_INDICES_CACHE[key]
+
 
 
 def get_all_irreps(n: int) -> list[SnIrrep]:
@@ -56,18 +84,15 @@ def lift_from_coset(lifted_fn: jax.Array, coset_fn: jax.Array, n: int, idx: int)
     Returns:
     None, operates in place on lifted_fn
     """
-    sn_perms = generate_all_permutations(n)
-    fixed_element = n - 1
-    
     # Create a boolean mask instead of using argwhere
-    mask = (sn_perms[:, idx] == fixed_element)
+    indices = get_cached_coset_indices(n, idx)
     
     # Use boolean indexing with .at[] syntax
     if coset_fn.ndim > 1:
         # Handle batch dimension
-        lifted_fn = lifted_fn.at[:, mask].set(coset_fn)
+        lifted_fn = lifted_fn.at[:, indices].set(coset_fn)
     else:
-        lifted_fn = lifted_fn.at[mask].set(coset_fn)
+        lifted_fn = lifted_fn.at[indices].set(coset_fn)
     
     return lifted_fn
 
@@ -85,18 +110,15 @@ def restrict_to_coset(tensor: jax.Array, n: int, idx: int) -> jax.Array:
     Returns:
     jax.Array either of shape (batch, (n-1)!) or ((n-1)!, ), depending on whether tensor had a batch dimension
     """
-    sn_perms = generate_all_permutations(n)
-    fixed_element = n - 1
     
-    # Create a boolean mask instead of using argwhere
-    mask = (sn_perms[:, idx] == fixed_element)
+    indices = get_cached_coset_indices(n, idx)
     
     # Use boolean indexing which works with JIT
     if tensor.ndim > 1:
         # Handle batch dimension
-        return tensor[:, mask]
+        return tensor[:, indices]
     else:
-        return tensor[mask]
+        return tensor[indices]
 
 
 @partial(jax.jit, static_argnums=1)
