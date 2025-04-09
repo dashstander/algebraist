@@ -278,7 +278,7 @@ def fourier_projection(fn_vals: jax.Array, irrep: SnIrrep) -> jax.Array:
     # assert coset_fns.shape == (fn_vals.shape[0], n, math.factorial(n-1)), coset_fns.shape
     
     coset_rep_matrices = jnp.expand_dims(
-        jax.stack(irrep.coset_rep_matrices()),
+        jnp.stack(irrep.coset_rep_matrices()),
         0
     )
     # assert coset_rep_matrices.shape == (1, n, irrep.dim, irrep.dim), coset_rep_matrices.shape
