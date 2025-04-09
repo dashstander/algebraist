@@ -43,42 +43,60 @@ def get_all_irreps(n: int) -> list[SnIrrep]:
 
 
 @partial(jax.jit, static_argnums=(2, 3))
-def lift_from_coset(lifted_fn, coset_fn: jax.Array, n: int, idx: int) -> jax.Array:
+def lift_from_coset(lifted_fn: jax.Array, coset_fn: jax.Array, n: int, idx: int) -> jax.Array:
     """
     Inverse operation of restrict_to_coset. Assigns values from S_{n-1} cosets back to their correct positions in S_n.
 
     Args:
-    tensor (jax.Array): The function on S_{n-1} cosets, shape (n, batch_size, (n-1)!)
-    sn_perms (jax.Array): A tensor-version of S_n with shape (n!, n)
+    lifted_fn: The target array to update
+    coset_fn (jax.Array): The function on S_{n-1} cosets, shape (batch_size, (n-1)!)
+    n (int): The size of the permutation group
+    idx (int): The index that defines the coset
 
     Returns:
     None, operates in place on lifted_fn
     """
     sn_perms = generate_all_permutations(n)
     fixed_element = n - 1
-    coset_idx = jnp.argwhere(sn_perms[:, idx] == fixed_element).squeeze()
-    lifted_fn.at[:, coset_idx].set(coset_fn[idx])
     
+    # Create a boolean mask instead of using argwhere
+    mask = (sn_perms[:, idx] == fixed_element)
+    
+    # Use boolean indexing with .at[] syntax
+    if coset_fn.ndim > 1:
+        # Handle batch dimension
+        lifted_fn = lifted_fn.at[:, mask].set(coset_fn)
+    else:
+        lifted_fn = lifted_fn.at[mask].set(coset_fn)
+    
+    return lifted_fn
+
 
 @partial(jax.jit, static_argnums=(1, 2))
 def restrict_to_coset(tensor: jax.Array, n: int, idx: int) -> jax.Array:
     """
     Returns the values that a function on S_n takes on of one of the cosets of S_{n-1} < S_n
 
-    There are n cosets of S_{n-1} < S_n. Young's Orthogonal Form (YOR) is specifically adapted to the copy of S_{n-1} where the element n is fixed in the nth position. The _cosets_ of this subgroup correspond to the elements that all have n in a given position.
-
     Args:
     tensor (jax.Array): The function on S_n we are working with, either shape (batch, n!) or (n!,)
-    sn_perms (jax.Array): A tensor-version of S_n with shape (n!, n), each row is the elements 0..n-1 permuted, and the rows are in lexicographic order
+    n (int): The size of the permutation group
     idx (int): The index of n that defines the coset we are grabbing
 
     Returns:
-    jax.Array either of shape (batch, (n-1)!) or ((n-1)!, ), depending on whether or not tensor had a batch dimension
+    jax.Array either of shape (batch, (n-1)!) or ((n-1)!, ), depending on whether tensor had a batch dimension
     """
     sn_perms = generate_all_permutations(n)
     fixed_element = n - 1
-    coset_idx = jnp.argwhere(sn_perms[:, idx] == fixed_element).squeeze()
-    return tensor[..., coset_idx]
+    
+    # Create a boolean mask instead of using argwhere
+    mask = (sn_perms[:, idx] == fixed_element)
+    
+    # Use boolean indexing which works with JIT
+    if tensor.ndim > 1:
+        # Handle batch dimension
+        return tensor[:, mask]
+    else:
+        return tensor[mask]
 
 
 @partial(jax.jit, static_argnums=1)
@@ -185,7 +203,7 @@ def inverse_fourier_projection(ft, irrep):
     # there are n elements in sub_ifts, each is an ift on 
     # assert all([ift.shape == (batch_dim, math.factorial(n-1)) for ift in sub_ifts])
 
-    fn_vals = jax.zeros((batch_dim, math.factorial(n)), dtype=ft.dtype, device=ft.device)
+    fn_vals = jax.zeros((batch_dim, math.factorial(n)))
     
     # reshapes from 
     for i, coset_ift in enumerate(sub_ifts):
@@ -228,12 +246,13 @@ def fourier_projection(fn_vals: jax.Array, irrep: SnIrrep) -> jax.Array:
         has_batch = False
         fn_vals = jnp.expand_dims(fn_vals, 0)
 
-    coset_fns = jnp.stack([restrict_to_coset(fn_vals, n, i) for i in range(n)]).permute(1, 0, 2)
+    coset_fns = jnp.stack([restrict_to_coset(fn_vals, n, i) for i in range(n)])
+    coset_fns = jnp.transpose(coset_fns, (1, 0, 2))
     # Now coset_fns shape is (batch_dim, n, (n-1)!)
     # assert coset_fns.shape == (fn_vals.shape[0], n, math.factorial(n-1)), coset_fns.shape
     
     coset_rep_matrices = jnp.expand_dims(
-        jax.stack(irrep.coset_rep_matrices(fn_vals.dtype, fn_vals.device)),
+        jax.stack(irrep.coset_rep_matrices()),
         0
     )
     # assert coset_rep_matrices.shape == (1, n, irrep.dim, irrep.dim), coset_rep_matrices.shape
@@ -324,12 +343,12 @@ def slow_sn_ift(ft, n: int):
     
     batch_size = ft[(n - 1, 1)].shape[0] if len(ft[(n - 1, 1)].shape) == 3 else None
     if batch_size is None:
-        ift = jnp.zeros((group_order,), device=ft[(n - 1, 1)].device)
+        ift = jnp.zeros((group_order,))
     else:
-        ift = jnp.zeros((batch_size, group_order), device=ft[(n - 1, 1)].device)
+        ift = jnp.zeros((batch_size, group_order))
     for shape, irrep_ft in ft.items():
         # Properly the formula says we should multiply by $rho(g^{-1})$, i.e. the transpose here
-        #inv_rep = irreps[shape].to(irrep_ft.dtype).to(irrep_ft.device)
+        #inv_rep = irreps[shape].to(irrep_ft.dtype)
         ift += _inverse_fourier_projection(irrep_ft, irreps[shape])
     
     return (ift / group_order)
@@ -353,12 +372,12 @@ def slow_sn_fourier_decomposition(ft, n: int):
     batch_size = ft[(n - 1, 1)].shape[0] if len(ft[(n - 1, 1)].shape) == 3 else None
 
     if batch_size is None:
-        ift = jnp.zeros((num_irreps, group_order,), device=ft[(n - 1, 1)].device)
+        ift = jnp.zeros((num_irreps, group_order,))
     else:
-        ift = jnp.zeros((num_irreps, batch_size, group_order), device=ft[(n - 1, 1)].device)
+        ift = jnp.zeros((num_irreps, batch_size, group_order))
 
     for i, (shape, irrep_ft) in enumerate(ft.items()):
-        #inv_rep = irreps[shape].to(irrep_ft.dtype).to(irrep_ft.device)
+        #inv_rep = irreps[shape].to(irrep_ft.dtype)
         ift[i] = _inverse_fourier_projection(irrep_ft, irreps[shape])
         
     if batch_size is not None:
