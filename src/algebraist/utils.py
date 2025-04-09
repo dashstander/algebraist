@@ -15,8 +15,10 @@
 from copy import deepcopy
 from functools import lru_cache
 from itertools import pairwise, permutations
-import torch
+import jax
+import jax.numpy as jnp
 from typing import Sequence
+
 
 
 def adj_trans_decomp(i: int, j: int) -> Sequence[tuple[int, ...]]:
@@ -57,10 +59,9 @@ def cycle_to_one_line(cycle_rep: list[tuple[int, ...]]) -> tuple[int, ...]:
     return tuple(sigma)
 
 
-
-@lru_cache(maxsize=20)
-def generate_all_permutations(n: int) -> torch.Tensor:
-    return torch.tensor(list(permutations(range(n))), dtype=torch.int64)
+@jax.jit
+def generate_all_permutations(n: int) -> jax.Array:
+    return jnp.array(list(permutations(range(n))))
 
 
 def trans_to_one_line(i: int, j: int, n: int) -> tuple[int, ...]:
