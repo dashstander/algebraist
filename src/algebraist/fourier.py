@@ -43,7 +43,7 @@ def get_all_irreps(n: int) -> list[SnIrrep]:
 
 
 @partial(jax.jit, static_argnums=(2, 3))
-def lift_from_coset(lifted_fn, coset_fn: jax.Array, sn_perms: jax.Array, idx: int) -> jax.Array:
+def lift_from_coset(lifted_fn, coset_fn: jax.Array, n: int, idx: int) -> jax.Array:
     """
     Inverse operation of restrict_to_coset. Assigns values from S_{n-1} cosets back to their correct positions in S_n.
 
@@ -54,14 +54,14 @@ def lift_from_coset(lifted_fn, coset_fn: jax.Array, sn_perms: jax.Array, idx: in
     Returns:
     None, operates in place on lifted_fn
     """
-    n = sn_perms.shape[1]
+    sn_perms = generate_all_permutations(n)
     fixed_element = n - 1
     coset_idx = jnp.argwhere(sn_perms[:, idx] == fixed_element).squeeze()
     lifted_fn.at[:, coset_idx].set(coset_fn[idx])
     
 
 @partial(jax.jit, static_argnums=(1, 2))
-def restrict_to_coset(tensor: jax.Array, sn_perms: jax.Array, idx: int) -> jax.Array:
+def restrict_to_coset(tensor: jax.Array, n: int, idx: int) -> jax.Array:
     """
     Returns the values that a function on S_n takes on of one of the cosets of S_{n-1} < S_n
 
@@ -75,7 +75,7 @@ def restrict_to_coset(tensor: jax.Array, sn_perms: jax.Array, idx: int) -> jax.A
     Returns:
     jax.Array either of shape (batch, (n-1)!) or ((n-1)!, ), depending on whether or not tensor had a batch dimension
     """
-    n = sn_perms.shape[1]
+    sn_perms = generate_all_permutations(n)
     fixed_element = n - 1
     coset_idx = jnp.argwhere(sn_perms[:, idx] == fixed_element).squeeze()
     return tensor[..., coset_idx]
@@ -139,8 +139,6 @@ def inverse_fourier_projection(ft, irrep):
     n = irrep.n
     if n <= BASE_CASE or irrep.dim == 1:
         return _inverse_fourier_projection(ft, irrep) / math.factorial(n)
-    
-    sn_perms = generate_all_permutations(n)
 
     # Ensure ft is always 3D (batch_dim, irrep.dim, irrep.dim)
     has_batch = True
@@ -192,7 +190,7 @@ def inverse_fourier_projection(ft, irrep):
     # reshapes from 
     for i, coset_ift in enumerate(sub_ifts):
         # operates in place on fn_vals
-        lift_from_coset(fn_vals, coset_ift, sn_perms, i)
+        lift_from_coset(fn_vals, coset_ift, n, i)
     
     if not has_batch:
         fn_vals = fn_vals.squeeze()
@@ -224,14 +222,13 @@ def fourier_projection(fn_vals: jax.Array, irrep: SnIrrep) -> jax.Array:
     n = irrep.n
     if n <= BASE_CASE or irrep.dim == 1:
         return _fourier_projection(fn_vals, irrep)
-    sn_perms = generate_all_permutations(n)
     # Ensure fn_vals is always 2D (batch_dim, n!)
     has_batch = True
     if jnp.ndim(fn_vals) == 1:
         has_batch = False
         fn_vals = jnp.expand_dims(fn_vals, 0)
 
-    coset_fns = jnp.stack([restrict_to_coset(fn_vals, sn_perms, i) for i in range(n)]).permute(1, 0, 2)
+    coset_fns = jnp.stack([restrict_to_coset(fn_vals, n, i) for i in range(n)]).permute(1, 0, 2)
     # Now coset_fns shape is (batch_dim, n, (n-1)!)
     # assert coset_fns.shape == (fn_vals.shape[0], n, math.factorial(n-1)), coset_fns.shape
     
