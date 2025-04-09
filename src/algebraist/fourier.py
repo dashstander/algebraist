@@ -56,7 +56,7 @@ def lift_from_coset(lifted_fn, coset_fn: jax.Array, sn_perms: jax.Array, idx: in
     n = sn_perms.shape[1]
     fixed_element = n - 1
     coset_idx = jnp.argwhere(sn_perms[:, idx] == fixed_element).squeeze()
-    lifted_fn[:, coset_idx] = coset_fn[idx]
+    lifted_fn.at[:, coset_idx].set(coset_fn[idx])
     
 
 def restrict_to_coset(tensor: jax.Array, sn_perms: jax.Array, idx: int) -> jax.Array:
