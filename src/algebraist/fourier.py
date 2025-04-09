@@ -42,6 +42,7 @@ def get_all_irreps(n: int) -> list[SnIrrep]:
     return [SnIrrep(n, p) for p in generate_partitions(n)]
 
 
+@partial(jax.jit, static_argnums=(2, 3))
 def lift_from_coset(lifted_fn, coset_fn: jax.Array, sn_perms: jax.Array, idx: int) -> jax.Array:
     """
     Inverse operation of restrict_to_coset. Assigns values from S_{n-1} cosets back to their correct positions in S_n.
@@ -59,6 +60,7 @@ def lift_from_coset(lifted_fn, coset_fn: jax.Array, sn_perms: jax.Array, idx: in
     lifted_fn.at[:, coset_idx].set(coset_fn[idx])
     
 
+@partial(jax.jit, static_argnums=(1, 2))
 def restrict_to_coset(tensor: jax.Array, sn_perms: jax.Array, idx: int) -> jax.Array:
     """
     Returns the values that a function on S_n takes on of one of the cosets of S_{n-1} < S_n
