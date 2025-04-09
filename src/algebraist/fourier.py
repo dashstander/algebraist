@@ -229,7 +229,7 @@ def inverse_fourier_projection(ft, irrep):
     # there are n elements in sub_ifts, each is an ift on 
     # assert all([ift.shape == (batch_dim, math.factorial(n-1)) for ift in sub_ifts])
 
-    fn_vals = jax.zeros((batch_dim, math.factorial(n)))
+    fn_vals = jnp.zeros((batch_dim, math.factorial(n)))
     
     # reshapes from 
     for i, coset_ift in enumerate(sub_ifts):
@@ -291,12 +291,12 @@ def fourier_projection(fn_vals: jax.Array, irrep: SnIrrep) -> jax.Array:
     ]
     
     # Use vmap to apply block_diag across the combined n * batch_dim
-    block_diag_vmap = jax.vmap(jax.vmap(jax.block_diag))
+    block_diag_vmap = jax.vmap(jax.vmap(jax.scipy.linalg.block_diag))
     combined_sub_fts = block_diag_vmap(*sub_fts)
     # combined_sub_fts shape: (n * batch_dim, irrep_dim, irrep_dim)
     # assert combined_sub_fts.shape == (fn_vals.shape[0], n, irrep.dim, irrep.dim)
     
-    result = jax.matmul(coset_rep_matrices, combined_sub_fts).sum(1)
+    result = jnp.matmul(coset_rep_matrices, combined_sub_fts).sum(1)
 
     if not has_batch:
         result = result.squeeze(0) 
